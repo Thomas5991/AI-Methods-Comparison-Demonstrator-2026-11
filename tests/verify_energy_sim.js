@@ -19,7 +19,7 @@ const S4_PRESETS = {
   B: 'Redispatch request: CHP max 30 MW_el 16:00–20:00'
 };
 
-function loadDemo(filename, isV2) {
+function loadDemo(filename, isV2, isV3 = false) {
   const htmlPath = path.join(__dirname, '..', filename);
   const html = fs.readFileSync(htmlPath, 'utf8');
   const start = html.lastIndexOf('<script>') + '<script>'.length;
@@ -33,9 +33,10 @@ function loadDemo(filename, isV2) {
   js = js.replace('function updateAllUI() {', 'function updateAllUI() { return; ');
   if (isV2) {
     js = js.replace('function renderVisualComparison(force = false) {', 'function renderVisualComparison(force = false) { return; ');
+    const extra = isV3 ? ', SCENARIO_BRIEFS' : '';
     js = js.replace(
       'window.onload = function () {',
-      'globalThis.__sim = { state, setupDay, stepSimulation, parseNaturalRule, rebuildRLValueGrids, EXPLANATIONS, CASE_BRIEFS, COMPONENT_DOCS, ARCH_PROS_CONS, computeComparativeSnapshot, computeScorecard }; window.onload = function () {'
+      `globalThis.__sim = { state, setupDay, stepSimulation, parseNaturalRule, rebuildRLValueGrids, EXPLANATIONS, CASE_BRIEFS, COMPONENT_DOCS, ARCH_PROS_CONS, computeComparativeSnapshot, computeScorecard${extra} }; window.onload = function () {`
     );
   } else {
     js = js.replace(
@@ -70,11 +71,11 @@ function loadDemo(filename, isV2) {
   return sandbox.__sim;
 }
 
-function verifyFile(filename, isV2) {
+function verifyFile(filename, isV2, isV3 = false) {
   console.log(`\n================================================================`);
   console.log(`VERIFYING: ${filename}`);
   console.log(`================================================================`);
-  const sim = loadDemo(filename, isV2);
+  const sim = loadDemo(filename, isV2, isV3);
   const { state, setupDay, stepSimulation, parseNaturalRule, EXPLANATIONS } = sim;
 
   function runDay(caseId, scenario, arch, opts = {}) {
@@ -254,8 +255,18 @@ function verifyFile(filename, isV2) {
     console.log('PASS: v2 comparative snapshot parity, side-effect freedom, scorecard, case briefs, component docs, and pros/cons verified.');
   }
 
+  if (isV3) {
+    for (const sc of SCENARIOS) {
+      for (const c of CASES) {
+        assert.ok(sim.SCENARIO_BRIEFS[sc][c] && sim.SCENARIO_BRIEFS[sc][c].length > 60, `SCENARIO_BRIEFS[${sc}][${c}]`);
+      }
+    }
+    console.log('PASS: v3 SCENARIO_BRIEFS (8 entries) verified.');
+  }
+
   console.log(`ALL ASSERTIONS PASSED FOR ${filename}.`);
 }
 
-verifyFile('ai_architectures_energy_planning_demonstrator-v1.html', false);
-verifyFile('ai_architectures_energy_planning_demonstrator-v2.html', true);
+verifyFile('ai_architectures_energy_planning_demonstrator-v1.html', false, false);
+verifyFile('ai_architectures_energy_planning_demonstrator-v2.html', true, false);
+verifyFile('ai_architectures_energy_planning_demonstrator-v3.html', true, true);

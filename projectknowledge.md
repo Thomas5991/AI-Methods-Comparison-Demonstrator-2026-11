@@ -22,6 +22,12 @@ Source: `Handover message.txt` and `ai_architectures_in_action_llms_jepa_rl_mpc_
   - Mode 6 (`full_triad`): **15 collisions total** (baseline `dynamic`: 1, `noise`: 1; perturbed: 6; moved-obstacle stress: 7).
   - Mode 4 in `ruleshift`: **0 goals** (0 violations) due to waypoint toggle oscillation at `rob.y < blueZone.y + blueZone.h + 25` in `stepHybridLLMJepa()`.
   - Mode 5 in `ruleshift`: **67 rule violations** (intended stale-RL demonstration); Mode 6 in `ruleshift`: **20 goals, 0 violations**.
+- **Post-Adaptation Verified Metrics (`node tests/verify_sim.js`, 2026-11-24):**
+  - Modes 3, 4, 5, 6: **0 collisions** across all 4 baseline scenarios, all 4 perturbation stress cases, and all 5 moved-obstacle stress cases.
+  - Mode 4 in `ruleshift`: **19 goals, 0 collisions, 0 violations** (36 rollouts).
+  - Mode 5 in `ruleshift`: **22 goals, 0 collisions, 67 violations** (11 rollouts, preserves intended stale-RL teaching contrast).
+  - Mode 6 in `ruleshift`: **20 goals, 0 collisions, 0 violations** (12 rollouts).
+  - Live browser check (`http://localhost:8765`, `BROWSER_HOST_FACTS` verified): 0 console errors, 11/12 rollout counts confirmed, clean detours in Scenario 4 for Modes 4 & 6, and static obstacle drag persistence confirmed across Reset and Mode 3 switch.
 
 ## Data Schemas & State Management
 Key functions in `ai_architectures_in_action_llms_jepa_rl_mpc_demonstrator-v2.html` *(verified)*:

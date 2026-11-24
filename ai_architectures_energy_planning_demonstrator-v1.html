@@ -1,0 +1,2785 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Architectures for Energy-Aware Planning &amp; Control: MPC, LLMs, Learned World Models &amp; RL</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+            mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace']
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    body {
+      background-color: #f8fafc;
+      color: #0f172a;
+      -webkit-font-smoothing: antialiased;
+    }
+    @keyframes subtlePulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.45; transform: scale(1.22); }
+    }
+    .live-dot {
+      animation: subtlePulse 1.6s ease-in-out infinite;
+    }
+    input[type="range"] {
+      accent-color: #0f172a;
+    }
+    canvas {
+      touch-action: none;
+    }
+  </style>
+</head>
+<body class="min-h-screen p-2.5 sm:p-4 lg:p-5">
+  <div class="max-w-[1440px] mx-auto space-y-4">
+
+    <!-- =======================================================================
+         TOP HEADER: TITLE, CASE SWITCH (A | B), LEGEND & 6 ARCHITECTURE CARDS
+         ======================================================================= -->
+    <header class="bg-white border border-slate-200 rounded-2xl shadow-sm p-3.5 sm:p-4 space-y-3">
+      <div class="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3">
+        <div class="space-y-0.5">
+          <h1 class="text-lg sm:text-xl font-extrabold tracking-tight text-slate-900">
+            AI Architectures for Energy-Aware Planning &amp; Control: MPC, LLMs, Learned World Models &amp; RL
+          </h1>
+          <p class="text-xs sm:text-sm text-slate-600">
+            Interactive digital-twin sandbox: industrial demand-side management and plant dispatch with storage
+          </p>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2.5 shrink-0">
+          <!-- Application Case Switch A | B -->
+          <div class="inline-flex rounded-xl bg-slate-100 p-1 border border-slate-200" role="tablist" aria-label="Application Case">
+            <button id="btnCaseA" data-case="A" class="case-btn px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer">
+              Case A: Industrial DSM (PPC)
+            </button>
+            <button id="btnCaseB" data-case="B" class="case-btn px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer">
+              Case B: CHP Plant Dispatch
+            </button>
+          </div>
+
+          <!-- Component Legend -->
+          <div class="hidden sm:flex flex-wrap items-center gap-1.5 text-[11px] font-semibold">
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-300">
+              <span class="w-2 h-2 rounded-full bg-slate-600"></span>Twin / MILP
+            </span>
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+              <span class="w-2 h-2 rounded-full bg-indigo-600"></span>LLM
+            </span>
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+              <span class="w-2 h-2 rounded-full bg-emerald-600"></span>Learned WM
+            </span>
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+              <span class="w-2 h-2 rounded-full bg-amber-500"></span>RL
+            </span>
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+              <span class="w-2 h-2 rounded-full bg-blue-600"></span>MPC
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 6 Architecture Selector Cards -->
+      <div id="archSelector" class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-2" role="tablist" aria-label="Select AI Architecture"></div>
+    </header>
+
+    <!-- =======================================================================
+         MAIN 2-COLUMN WORKSPACE (LEFT ~60% TIMELINE CANVAS | RIGHT ~40% TELEMETRY)
+         ======================================================================= -->
+    <main class="grid grid-cols-1 xl:grid-cols-12 gap-4 items-start">
+
+      <!-- LEFT COLUMN (7 of 12 cols) -->
+      <section class="xl:col-span-7 bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+        <!-- Scenario Tabs & Transport Controls -->
+        <div class="p-3 border-b border-slate-200 bg-slate-50/70 space-y-2.5">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div id="scenarioTabs" class="flex flex-wrap gap-1.5" role="tablist" aria-label="Select Scenario">
+              <button data-scenario="S1" class="scenario-btn px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition cursor-pointer">
+                S1: Forecast Disturbances
+              </button>
+              <button data-scenario="S2" class="scenario-btn px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition cursor-pointer">
+                S2: Model Mismatch
+              </button>
+              <button data-scenario="S3" class="scenario-btn px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition cursor-pointer">
+                S3: Storage Dilemma
+              </button>
+              <button data-scenario="S4" class="scenario-btn px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition cursor-pointer">
+                S4: Rule Shift (Zero-Shot)
+              </button>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-1.5">
+              <button id="btnPlayPause" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-900 text-white hover:bg-slate-800 transition cursor-pointer">
+                Pause
+              </button>
+              <button id="btnReset" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-white text-slate-700 border border-slate-300 hover:bg-slate-100 transition cursor-pointer">
+                Reset
+              </button>
+              <select id="speedSelect" aria-label="Simulation Speed" class="px-2 py-1.5 rounded-lg text-xs font-semibold bg-white text-slate-700 border border-slate-300 cursor-pointer">
+                <option value="0.5">0.5x</option>
+                <option value="1" selected>1x (45s/day)</option>
+                <option value="2">2x</option>
+                <option value="4">4x</option>
+              </select>
+              <button id="btnDisturb" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 transition cursor-pointer">
+                Inject disturbance
+              </button>
+            </div>
+          </div>
+
+          <!-- Fixed-Height Contextual Scenario Controls + Visual Toggles (prevents layout shift) -->
+          <div class="min-h-[44px] flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-200/80 text-xs">
+            <div id="scenarioControlSlot" class="flex flex-wrap items-center gap-2 flex-1 min-w-[260px]">
+              <!-- S1 Controls -->
+              <div id="ctrlS1" class="flex flex-wrap items-center gap-2 text-slate-600">
+                <span class="font-semibold text-slate-700">Disturbance handle:</span>
+                <span>Drag the <span class="text-rose-600 font-semibold">spike/dip marker</span> on Panel 1</span>
+                <span id="s1TimeBadge" class="font-mono font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-800">12:00</span>
+              </div>
+
+              <!-- S2 Controls -->
+              <div id="ctrlS2" class="hidden flex-wrap items-center gap-2">
+                <label for="mismatchSlider" class="font-semibold text-slate-700 whitespace-nowrap">Plant Deviation:</label>
+                <input id="mismatchSlider" type="range" min="0" max="40" value="25" class="w-28 cursor-pointer" />
+                <span id="mismatchVal" class="font-mono font-bold text-slate-900 w-9">25%</span>
+                <button id="btnReparam" class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-300 hover:bg-amber-100 transition cursor-pointer">
+                  Engineer re-parametrises twin
+                </button>
+                <span id="reparamStatus" class="text-[11px] font-semibold text-slate-500"></span>
+              </div>
+
+              <!-- S3 Controls -->
+              <div id="ctrlS3" class="hidden flex-wrap items-center gap-2">
+                <label for="horizonSlider" class="font-semibold text-slate-700 whitespace-nowrap">MPC Horizon:</label>
+                <input id="horizonSlider" type="range" min="1" max="12" value="4" class="w-28 cursor-pointer" />
+                <span id="horizonVal" class="font-mono font-bold text-slate-900 whitespace-nowrap">4 h (16 steps)</span>
+              </div>
+
+              <!-- S4 Controls -->
+              <div id="ctrlS4" class="hidden flex-wrap items-center gap-1.5 w-full sm:w-auto">
+                <input id="ruleInput" type="text" class="px-2 py-1 rounded-lg border border-slate-300 text-xs font-medium text-slate-800 w-64 sm:w-72 bg-white" />
+                <button id="btnApplyRule" class="px-2 py-1 rounded-lg text-xs font-semibold bg-indigo-600 text-white hover:bg-indigo-700 transition cursor-pointer">
+                  Apply
+                </button>
+                <button id="btnPreset1" class="px-2 py-1 rounded-lg text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-300 hover:bg-slate-200 transition cursor-pointer">
+                  Preset 1
+                </button>
+                <button id="btnPreset2" class="px-2 py-1 rounded-lg text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-300 hover:bg-slate-200 transition cursor-pointer">
+                  Preset 2
+                </button>
+                <button id="btnEncodeRule" class="px-2 py-1 rounded-lg text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-300 hover:bg-amber-100 transition cursor-pointer">
+                  Engineer encodes constraint
+                </button>
+                <span id="encodeStatus" class="text-[11px] font-semibold text-slate-500"></span>
+              </div>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-3 shrink-0">
+              <label class="inline-flex items-center gap-1.5 font-semibold text-slate-700 cursor-pointer select-none">
+                <input id="toggleHeatmap" type="checkbox" checked class="rounded border-slate-300 text-amber-600 cursor-pointer" />
+                <span>Show RL value V(t, SoC)</span>
+              </label>
+              <label class="inline-flex items-center gap-1.5 font-semibold text-slate-700 cursor-pointer select-none">
+                <input id="toggleRollouts" type="checkbox" checked class="rounded border-slate-300 text-blue-600 cursor-pointer" />
+                <span>Show MPC rollouts</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4-Panel Stacked Simulation Canvas -->
+        <div class="p-3 space-y-2">
+          <div id="canvasWrapper" class="relative w-full aspect-[720/470] bg-white border border-slate-300 rounded-xl overflow-hidden shadow-inner">
+            <canvas id="simCanvas" class="block w-full h-full"></canvas>
+          </div>
+
+          <!-- Compact Legend -->
+          <div class="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-600 px-0.5">
+            <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span class="inline-flex items-center gap-1"><span class="w-3 h-0.5 bg-slate-900 inline-block"></span>Now cursor (15-min steps)</span>
+              <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-emerald-500 inline-block"></span>Executed</span>
+              <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm border border-dashed border-slate-500 bg-slate-100 inline-block"></span>Planned</span>
+              <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-rose-500/80 inline-block"></span>Violation / Deficit</span>
+              <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-indigo-200 border border-indigo-600 inline-block"></span>Known Rule</span>
+              <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm border border-dashed border-rose-600 bg-rose-50 inline-block"></span>Ignored Rule</span>
+            </div>
+            <span id="dayLoopLabel" class="font-mono font-semibold text-slate-500">Day 1 · 00:00</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- RIGHT COLUMN (5 of 12 cols) -->
+      <aside class="xl:col-span-5 space-y-3">
+
+        <!-- Live Architecture Pipeline -->
+        <section class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+          <div class="px-3.5 py-2.5 border-b border-slate-200 bg-slate-50/70 flex items-center justify-between gap-2">
+            <h2 class="text-xs sm:text-sm font-bold text-slate-900">Live Architecture Pipeline</h2>
+            <span id="pipelineModeBadge" class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+              0. Classical MPC
+            </span>
+          </div>
+          <div id="pipelineContainer" class="p-3 space-y-1.5"></div>
+        </section>
+
+        <!-- 2x2 KPI Cards -->
+        <section class="grid grid-cols-2 gap-2.5">
+          <div class="bg-white border border-slate-200 rounded-xl p-2.5 shadow-sm">
+            <div id="kpi1Title" class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Energy Cost</div>
+            <div class="mt-0.5 flex items-baseline justify-between gap-1">
+              <span id="kpi1Val" class="text-base sm:text-lg font-extrabold font-mono text-slate-900">0 €</span>
+              <span id="kpi1Sub" class="text-[11px] font-medium text-slate-500">Peak: 0 kW</span>
+            </div>
+          </div>
+
+          <div class="bg-white border border-slate-200 rounded-xl p-2.5 shadow-sm">
+            <div id="kpi2Title" class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Compute / Step</div>
+            <div class="mt-0.5 flex items-baseline justify-between gap-1">
+              <span id="kpi2Val" class="text-base sm:text-lg font-extrabold font-mono text-slate-900">0 nodes</span>
+              <span id="kpi2Sub" class="text-[11px] font-medium text-slate-500">0 ms</span>
+            </div>
+          </div>
+
+          <div class="bg-white border border-slate-200 rounded-xl p-2.5 shadow-sm">
+            <div id="kpi3Title" class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Violations / Misses</div>
+            <div class="mt-0.5 flex items-baseline justify-between gap-1">
+              <span id="kpi3Val" class="text-base sm:text-lg font-extrabold font-mono text-slate-900">0 / 0</span>
+              <span id="kpi3Sub" class="text-[11px] font-semibold text-slate-600">0 misses</span>
+            </div>
+          </div>
+
+          <div class="bg-white border border-slate-200 rounded-xl p-2.5 shadow-sm">
+            <div class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Task Status</div>
+            <div class="mt-1">
+              <span id="kpiStatus" class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold bg-slate-100 text-slate-800">
+                Initializing
+              </span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Dynamic "Why is it behaving this way?" Explanation Box -->
+        <section class="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-sm space-y-1">
+          <div class="flex items-center justify-between gap-2">
+            <h3 class="text-xs font-extrabold uppercase tracking-wider text-slate-700">
+              Why is it behaving this way?
+            </h3>
+            <span id="explainTag" class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+              Case A · S1
+            </span>
+          </div>
+          <p id="explainText" class="text-xs sm:text-[13px] text-slate-700 leading-relaxed"></p>
+        </section>
+      </aside>
+    </main>
+
+    <!-- =======================================================================
+         BOTTOM SECTION: 6-ARCHITECTURE COMPARISON MATRIX
+         ======================================================================= -->
+    <section class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+      <div class="px-4 py-2.5 border-b border-slate-200 bg-slate-50/70 flex flex-wrap items-center justify-between gap-2">
+        <h2 class="text-xs sm:text-sm font-bold text-slate-900">6-Architecture Comparison Matrix</h2>
+        <span class="text-xs text-slate-500 font-medium">Currently selected architecture is highlighted</span>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse text-xs">
+          <thead>
+            <tr class="bg-slate-50 border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-500 font-bold">
+              <th class="py-2.5 px-3 whitespace-nowrap">Architecture</th>
+              <th class="py-2.5 px-3">Model basis</th>
+              <th class="py-2.5 px-3">Beyond-horizon storage value</th>
+              <th class="py-2.5 px-3">Robustness to model mismatch</th>
+              <th class="py-2.5 px-3">Compute scaling with horizon</th>
+              <th class="py-2.5 px-3">Zero-shot rule adaptation</th>
+              <th class="py-2.5 px-3 whitespace-nowrap">Typical reference</th>
+            </tr>
+          </thead>
+          <tbody id="matrixBody" class="divide-y divide-slate-200"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Persistent Educational Disclaimer -->
+    <footer class="text-center text-[11px] text-slate-500 pb-1">
+      Stylized educational simulation. Controllers are simplified; LLM behaviour is emulated (no live model call); the latent world model is conceptual (JEPA-type).
+    </footer>
+
+  </div>
+
+  <!-- =========================================================================
+       SIMULATION ENGINE, CONTROLLERS, RLS, BELLMAN V(t, SoC), CANVAS & UI
+       ========================================================================= -->
+  <script>
+    (function () {
+      'use strict';
+
+      /* -----------------------------------------------------------------------
+         1. CONSTANTS & ARCHITECTURE DEFINITIONS
+         ----------------------------------------------------------------------- */
+      const STEPS = 96; // 24 h * 4 (15-min steps)
+      const DT = 0.25;  // hours per step
+      const SOC_BINS = 35;
+      const SOC_MIN = 0.10;
+      const SOC_MAX = 0.95;
+
+      const CANVAS_W = 720;
+      const CANVAS_H = 470;
+      const PLOT_L = 58;
+      const PLOT_R = 654;
+      const PLOT_W = PLOT_R - PLOT_L;
+
+      const ARCHS = [
+        {
+          id: 'classical_mpc',
+          shortTitle: '0. Classical MPC',
+          subtitle: 'MILP-type (DP) + physics twin',
+          badges: [{ label: 'Twin/MILP', cls: 'bg-slate-700' }, { label: 'MPC', cls: 'bg-blue-600' }],
+          accentHex: '#334155',
+          activeCardCls: 'border-slate-700 bg-slate-100/80 ring-2 ring-slate-300',
+          rowHighlightCls: 'bg-slate-100/80',
+          matrix: {
+            basis: 'First-principles nominal white-box twin',
+            storageVal: 'Only within horizon (needs ≥ 8–10 h)',
+            mismatch: 'Low (violations until engineer re-parametrises)',
+            compute: 'Steep exponential/polynomial growth with H',
+            zeroShot: 'Low (requires manual constraint encoding)',
+            ref: 'MILP-based MPC (standard practice)'
+          }
+        },
+        {
+          id: 'llm_only',
+          shortTitle: '1. LLM Only',
+          subtitle: 'Emulated heuristic policy',
+          badges: [{ label: 'LLM', cls: 'bg-indigo-600' }],
+          accentHex: '#4f46e5',
+          activeCardCls: 'border-indigo-500 bg-indigo-50/70 ring-2 ring-indigo-200',
+          rowHighlightCls: 'bg-indigo-50/70',
+          matrix: {
+            basis: 'Symbolic text heuristics (no dynamics model)',
+            storageVal: 'Coarse qualitative idea, wrong quantities',
+            mismatch: 'None (ignores physical equations)',
+            compute: 'Constant / low (0 solver rollouts)',
+            zeroShot: 'High semantics, breaks energy/power balance',
+            ref: 'LLM-to-optimisation formulation (e.g. OptiMUS)'
+          }
+        },
+        {
+          id: 'wm_mpc',
+          shortTitle: '2. Learned WM + MPC',
+          subtitle: 'Online RLS latent WM + CEM',
+          badges: [{ label: 'WM', cls: 'bg-emerald-600' }, { label: 'MPC', cls: 'bg-blue-600' }],
+          accentHex: '#059669',
+          activeCardCls: 'border-emerald-500 bg-emerald-50/70 ring-2 ring-emerald-200',
+          rowHighlightCls: 'bg-emerald-50/70',
+          matrix: {
+            basis: 'Online RLS-adapted latent dynamics',
+            storageVal: 'No (myopic beyond MPC horizon H)',
+            mismatch: 'High (online RLS tracks true plant)',
+            compute: 'Moderate (~64 CEM rollouts/step)',
+            zeroShot: 'Low (no natural-language rule channel)',
+            ref: 'JEPA (LeCun / Meta I-JEPA, V-JEPA)'
+          }
+        },
+        {
+          id: 'llm_wm_mpc',
+          shortTitle: '3. Hybrid: LLM + WM + MPC',
+          subtitle: 'Semantic subgoals + RLS WM',
+          badges: [{ label: 'LLM', cls: 'bg-indigo-600' }, { label: 'WM', cls: 'bg-emerald-600' }, { label: 'MPC', cls: 'bg-blue-600' }],
+          accentHex: '#4f46e5',
+          activeCardCls: 'border-indigo-500 bg-indigo-50/70 ring-2 ring-indigo-200',
+          rowHighlightCls: 'bg-indigo-50/60',
+          matrix: {
+            basis: 'Language subgoals + RLS-adapted WM',
+            storageVal: 'Yes (LLM sets pre-charge subgoals)',
+            mismatch: 'High (online RLS tracks true plant)',
+            compute: 'Moderate (~64 CEM rollouts/step)',
+            zeroShot: 'Very High (instant constraint injection)',
+            ref: 'LLM + JEPA World Model + MPC'
+          }
+        },
+        {
+          id: 'wm_rl_mpc',
+          shortTitle: '4. WM + RL + MPC',
+          subtitle: 'TD-MPC2 style V(t, SoC)',
+          badges: [{ label: 'WM', cls: 'bg-emerald-600' }, { label: 'RL', cls: 'bg-amber-500' }, { label: 'MPC', cls: 'bg-blue-600' }],
+          accentHex: '#d97706',
+          activeCardCls: 'border-amber-500 bg-amber-50/70 ring-2 ring-amber-200',
+          rowHighlightCls: 'bg-amber-50/70',
+          matrix: {
+            basis: 'RLS WM + Bellman Value Critic V(t, SoC)',
+            storageVal: 'Yes (V(t, SoC) terminal value at 4 h)',
+            mismatch: 'High (online RLS tracks true plant)',
+            compute: 'Low (~16 warm-started rollouts/step)',
+            zeroShot: 'Poor (stale value policy violates new rules)',
+            ref: 'TD-MPC2 (Hansen et al., 2024)'
+          }
+        },
+        {
+          id: 'full_triad',
+          shortTitle: '5. Full Triad',
+          subtitle: 'LLM + WM + RL + MPC',
+          badges: [{ label: 'LLM', cls: 'bg-indigo-600' }, { label: 'WM', cls: 'bg-emerald-600' }, { label: 'RL', cls: 'bg-amber-500' }, { label: 'MPC', cls: 'bg-blue-600' }],
+          accentHex: '#2563eb',
+          activeCardCls: 'border-blue-600 bg-blue-50/70 ring-2 ring-blue-200',
+          rowHighlightCls: 'bg-blue-50/70',
+          matrix: {
+            basis: 'Symbolic LLM + RLS WM + Safe V(t, SoC)',
+            storageVal: 'Yes (long-horizon V(t, SoC) + LLM)',
+            mismatch: 'High (online RLS tracks true plant)',
+            compute: 'Low (~18 warm-started rollouts + rare LLM)',
+            zeroShot: 'Very High (LLM masks stale RL policy)',
+            ref: 'Full Triad (LLM + JEPA + TD-MPC2)'
+          }
+        }
+      ];
+
+      const S4_PRESETS = {
+        A: [
+          'Grid operator: cap import at 1.0 MW between 17:00 and 19:00',
+          'Furnace maintenance until 14:00'
+        ],
+        B: [
+          'Redispatch request: CHP max 30 MW_el 16:00–20:00',
+          'Heat storage max 70 % (inspection)'
+        ]
+      };
+
+      /* -----------------------------------------------------------------------
+         2. GLOBAL STATE
+         ----------------------------------------------------------------------- */
+      const state = {
+        caseId: 'A',          // 'A' | 'B'
+        arch: 'classical_mpc',
+        scenario: 'S1',       // 'S1' | 'S2' | 'S3' | 'S4'
+        running: true,
+        speed: 1,             // 0.5 | 1 | 2 | 4
+        showHeatmap: true,
+        showRollouts: true,
+
+        dayCount: 1,
+        step: 0,
+        endPauseTicks: 0,
+        lastTickMs: 0,
+        accumMs: 0,
+
+        // Scenario parameters (persist across day resets)
+        disturbStep: { A: 48, B: 44 }, // Draggable spike/dip step on Panel 1
+        outageTimer: 0,                // Breakdown (A) / CHP trip (B) remaining steps
+        mismatchPct: 25,               // S2: 0..40%
+        twinReparamDone: false,
+        twinReparamTimer: 0,           // Delay steps before engineer update completes
+        horizonHours: 4,               // S3: 1..12 h
+
+        // S4 Rule Shift
+        ruleText: S4_PRESETS.A[0],
+        parsedRule: null,
+        ruleInjectStep: 28,            // 07:00 mid-day rule arrival
+        ruleActive: false,
+        baselineRuleEncoded: false,
+        encodeTimer: 0,
+
+        // Plant State (Case A & B)
+        batSoC: 0.30,
+        thSoC: 0.35,
+        hsSoC: 0.22,
+        chpOn: true,
+        chpPel: 25,
+        jobs: [],
+
+        // Online RLS parameter estimates (converge from nominal to true)
+        rls: {
+          batCapEst: 2.0,
+          batEtaEst: Math.sqrt(0.90),
+          thCapEst: 3.0,
+          thLossEst: 0.008,
+          hsCapEst: 400,
+          hsLossEst: 0.003,
+          boilCapEst: 40,
+          samples: 0
+        },
+
+        // 2D Bellman Value Grids V[t][bin] (true € continuation + normalized 0..1 for heatmap)
+        valueGridStale: [],
+        valueGridSafe: [],
+        valueNormStale: [],
+        valueNormSafe: [],
+
+        // History & Rollouts for Canvas
+        history: [],
+        plannedJobs: {},
+        plannedChp: [],
+        mpcRollouts: [],
+        bestRollout: null,
+
+        // KPIs
+        energyCost: 0,
+        peakImportKw: 0,
+        netMargin: 0,
+        chpStarts: 0,
+        unmetHeatMwh: 0,
+        limitViolations: 0,
+        ruleViolations: 0,
+        deadlineMisses: 0,
+        computeMetric: 0,
+        computeUnit: 'nodes',
+        latencyMs: 4,
+        statusLabel: 'Navigating',
+        statusTone: 'neutral',
+        llmLog: 'Waiting for step...',
+
+        // Last completed day KPIs per `${caseId}:${scenario}:${arch}`
+        lastDayKPIs: {},
+
+        // Drag state for Panel 1 disturbance
+        draggingDisturb: false
+      };
+
+      /* -----------------------------------------------------------------------
+         3. DOM REFERENCES
+         ----------------------------------------------------------------------- */
+      const canvas = document.getElementById('simCanvas');
+      const ctx = canvas.getContext('2d');
+      const canvasWrapper = document.getElementById('canvasWrapper');
+
+      const btnCaseA = document.getElementById('btnCaseA');
+      const btnCaseB = document.getElementById('btnCaseB');
+      const archSelector = document.getElementById('archSelector');
+      const scenarioBtns = document.querySelectorAll('.scenario-btn');
+      const btnPlayPause = document.getElementById('btnPlayPause');
+      const btnReset = document.getElementById('btnReset');
+      const speedSelect = document.getElementById('speedSelect');
+      const btnDisturb = document.getElementById('btnDisturb');
+
+      const ctrlS1 = document.getElementById('ctrlS1');
+      const ctrlS2 = document.getElementById('ctrlS2');
+      const ctrlS3 = document.getElementById('ctrlS3');
+      const ctrlS4 = document.getElementById('ctrlS4');
+      const s1TimeBadge = document.getElementById('s1TimeBadge');
+      const mismatchSlider = document.getElementById('mismatchSlider');
+      const mismatchVal = document.getElementById('mismatchVal');
+      const btnReparam = document.getElementById('btnReparam');
+      const reparamStatus = document.getElementById('reparamStatus');
+      const horizonSlider = document.getElementById('horizonSlider');
+      const horizonVal = document.getElementById('horizonVal');
+      const ruleInput = document.getElementById('ruleInput');
+      const btnApplyRule = document.getElementById('btnApplyRule');
+      const btnPreset1 = document.getElementById('btnPreset1');
+      const btnPreset2 = document.getElementById('btnPreset2');
+      const btnEncodeRule = document.getElementById('btnEncodeRule');
+      const encodeStatus = document.getElementById('encodeStatus');
+
+      const toggleHeatmap = document.getElementById('toggleHeatmap');
+      const toggleRollouts = document.getElementById('toggleRollouts');
+      const dayLoopLabel = document.getElementById('dayLoopLabel');
+
+      const pipelineModeBadge = document.getElementById('pipelineModeBadge');
+      const pipelineContainer = document.getElementById('pipelineContainer');
+      const kpi1Title = document.getElementById('kpi1Title');
+      const kpi1Val = document.getElementById('kpi1Val');
+      const kpi1Sub = document.getElementById('kpi1Sub');
+      const kpi2Title = document.getElementById('kpi2Title');
+      const kpi2Val = document.getElementById('kpi2Val');
+      const kpi2Sub = document.getElementById('kpi2Sub');
+      const kpi3Title = document.getElementById('kpi3Title');
+      const kpi3Val = document.getElementById('kpi3Val');
+      const kpi3Sub = document.getElementById('kpi3Sub');
+      const kpiStatus = document.getElementById('kpiStatus');
+      const explainTag = document.getElementById('explainTag');
+      const explainText = document.getElementById('explainText');
+      const matrixBody = document.getElementById('matrixBody');
+
+      /* -----------------------------------------------------------------------
+         4. HELPERS & DETERMINISTIC PROFILES (CASES A & B)
+         ----------------------------------------------------------------------- */
+      function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+      function stepToHHMM(step) {
+        const mins = Math.round(step * 15);
+        const h = Math.floor(mins / 60) % 24;
+        const m = mins % 60;
+        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+      }
+      function socToBin(soc) {
+        return clamp(Math.round(((soc - SOC_MIN) / (SOC_MAX - SOC_MIN)) * (SOC_BINS - 1)), 0, SOC_BINS - 1);
+      }
+      function binToSoc(bin) {
+        return SOC_MIN + (bin / (SOC_BINS - 1)) * (SOC_MAX - SOC_MIN);
+      }
+
+      function getNominalParams(caseId) {
+        if (caseId === 'A') {
+          return {
+            batCap: 2.0,
+            batPmax: 1.0,
+            batEta: Math.sqrt(0.90),
+            thCap: 3.0,
+            ebPmax: 0.8,
+            ebCop: 1.5,
+            thLoss: 0.008,
+            gridLimit: 1.50
+          };
+        }
+        return {
+          chpPelMax: 50,
+          chpPelMin: 20,
+          chpRatio: 1.2,
+          chpRamp: 5,
+          chpFuelCost: 65,
+          chpStartCost: 3500,
+          boilMax: 40,
+          boilCost: 145,
+          hsCap: 400,
+          hsPmax: 50,
+          hsLoss: 0.003
+        };
+      }
+
+      function getTrueParams(caseId) {
+        const nom = getNominalParams(caseId);
+        const m = state.scenario === 'S2' ? (state.mismatchPct / 100) : 0;
+        if (caseId === 'A') {
+          return {
+            ...nom,
+            batCap: nom.batCap * (1 - m),
+            batEta: nom.batEta * (1 - 0.35 * m),
+            thCap: nom.thCap * (1 - 0.60 * m),
+            thLoss: nom.thLoss * (1 + 5.0 * m)
+          };
+        }
+        return {
+          ...nom,
+          boilMax: nom.boilMax * (1 - 1.15 * m),
+          hsCap: nom.hsCap * (1 - 0.60 * m),
+          hsLoss: nom.hsLoss * (1 + 6.0 * m)
+        };
+      }
+
+      function getTwinParams(caseId) {
+        if (state.scenario === 'S2' && state.twinReparamDone) {
+          return getTrueParams(caseId);
+        }
+        return getNominalParams(caseId);
+      }
+
+      function getLearnedParams(caseId) {
+        const nom = getNominalParams(caseId);
+        if (caseId === 'A') {
+          return {
+            ...nom,
+            batCap: state.rls.batCapEst,
+            batEta: state.rls.batEtaEst,
+            thCap: state.rls.thCapEst,
+            thLoss: state.rls.thLossEst
+          };
+        }
+        return {
+          ...nom,
+          boilMax: state.rls.boilCapEst,
+          hsCap: state.rls.hsCapEst,
+          hsLoss: state.rls.hsLossEst
+        };
+      }
+
+      // Deterministic 96-step exogenous profiles
+      function getExogenous(caseId, t, forForecast = false) {
+        const tt = clamp(t, 0, STEPS - 1);
+        const distT = state.disturbStep[caseId];
+        const hasDisturb = state.scenario === 'S1' && (!forForecast || tt <= state.step + 2);
+
+        if (caseId === 'A') {
+          let baseLoad = 0.78 + 0.06 * Math.sin(((tt - 24) * Math.PI) / 48);
+          if (tt >= 68 && tt < 76) baseLoad += 0.16; // Evening shift overlap 17:00-19:00
+          // Smooth PV curve 06:00..20:00 (t=24..80)
+          let pv = 0;
+          if (tt >= 24 && tt <= 80) {
+            pv = 1.00 * Math.pow(Math.sin(((tt - 24) / 56) * Math.PI), 1.35);
+          }
+          // Price curve: night 118, morning 140, midday PV trough 48, 17:00-19:00 105, 19:00-21:00 peak 275
+          let price = 118;
+          if (tt >= 28 && tt < 40) {
+            price = 118 + 25 * Math.sin(((tt - 28) / 12) * Math.PI);
+          } else if (tt >= 40 && tt < 60) {
+            price = 48;
+          } else if (tt >= 60 && tt < 68) {
+            price = 48 + ((tt - 60) / 8) * 57;
+          } else if (tt >= 68 && tt < 76) {
+            price = 105;
+          } else if (tt >= 76 && tt < 84) {
+            price = 275;
+          } else if (tt >= 84) {
+            price = 90;
+          }
+          const heatDemand = 0.30 + 0.24 * Math.exp(-0.5 * Math.pow((tt - 52) / 22, 2));
+
+          if (hasDisturb) {
+            const gDip = Math.exp(-0.5 * Math.pow((tt - distT) / 3.2, 2));
+            pv = Math.max(0, pv - 0.72 * gDip);
+            price += 115 * Math.exp(-0.5 * Math.pow((tt - distT) / 2.8, 2));
+          }
+          return { baseLoad, pv, price, heatDemand };
+        }
+
+        // Case B
+        let price = 50;
+        if (tt >= 28 && tt < 46) {
+          price = 50 + 85 * Math.sin(((tt - 28) / 18) * Math.PI);
+        } else if (tt >= 46 && tt < 62) {
+          price = 75;
+        } else if (tt >= 62 && tt < 70) {
+          price = 75 + ((tt - 62) / 8) * 115;
+        } else if (tt >= 70 && tt < 82) {
+          price = 190;
+        } else if (tt >= 82) {
+          price = 65;
+        }
+
+        // District heating demand: 42 night -> 88 morning peak (08:00-11:30) -> 50 midday -> 72 evening peak
+        let heatDemand = 42;
+        if (tt >= 20 && tt < 32) {
+          heatDemand = 42 + ((tt - 20) / 12) * 46;
+        } else if (tt >= 32 && tt < 46) {
+          heatDemand = 88;
+        } else if (tt >= 46 && tt < 52) {
+          heatDemand = 88 - ((tt - 46) / 6) * 38;
+        } else if (tt >= 52 && tt < 64) {
+          heatDemand = 50;
+        } else if (tt >= 64 && tt < 70) {
+          heatDemand = 50 + ((tt - 64) / 6) * 22;
+        } else if (tt >= 70 && tt < 82) {
+          heatDemand = 72;
+        } else if (tt >= 82) {
+          heatDemand = 45;
+        }
+
+        if (hasDisturb) {
+          const gSurge = Math.exp(-0.5 * Math.pow((tt - distT) / 3.0, 2));
+          heatDemand += 15 * gSurge;
+          price += 75 * gSurge;
+        }
+        return { price, heatDemand };
+      }
+
+      /* -----------------------------------------------------------------------
+         5. NATURAL-LANGUAGE RULE PARSER (S4 ZERO-SHOT)
+         ----------------------------------------------------------------------- */
+      function parseHHMMToStep(hh, mm) {
+        return clamp(Math.round((Number(hh) * 60 + Number(mm)) / 15), 0, STEPS);
+      }
+
+      function parseNaturalRule(text, caseId) {
+        const raw = (text || '').trim();
+        const lower = raw.toLowerCase();
+
+        // Extract time window
+        let startStep = 0;
+        let endStep = STEPS;
+        const rangeMatch = raw.match(/(\d{1,2}):(\d{2})\s*(?:-|–|to|and)\s*(\d{1,2}):(\d{2})/i);
+        const untilMatch = raw.match(/until\s+(\d{1,2}):(\d{2})/i);
+        if (rangeMatch) {
+          startStep = parseHHMMToStep(rangeMatch[1], rangeMatch[2]);
+          endStep = parseHHMMToStep(rangeMatch[3], rangeMatch[4]);
+        } else if (untilMatch) {
+          startStep = 0;
+          endStep = parseHHMMToStep(untilMatch[1], untilMatch[2]);
+        }
+
+        // Extract numeric limit + unit
+        const mwMatch = raw.match(/(\d+(?:\.\d+)?)\s*(?:mw_el|mw|kw)/i);
+        const pctMatch = raw.match(/(\d+(?:\.\d+)?)\s*%/i);
+
+        if (caseId === 'A') {
+          if (lower.includes('furnace') || lower.includes('maintenance')) {
+            if (!untilMatch && !rangeMatch) { startStep = 0; endStep = 56; }
+            return {
+              valid: true,
+              type: 'furnace_lockout',
+              label: 'Furnace Maintenance',
+              formula: `u_furnace(t) = 0  ∀ t ∈ [${stepToHHMM(startStep)}, ${stepToHHMM(endStep)})`,
+              startStep,
+              endStep,
+              limitValue: 0,
+              rawText: raw
+            };
+          }
+          if (lower.includes('import') || lower.includes('grid') || lower.includes('cap') || mwMatch) {
+            let lim = mwMatch ? Number(mwMatch[1]) : 1.0;
+            if (mwMatch && /kw/i.test(mwMatch[0])) lim /= 1000;
+            lim = clamp(lim, 0.3, 1.5);
+            if (!rangeMatch && !untilMatch) { startStep = 68; endStep = 76; }
+            return {
+              valid: true,
+              type: 'grid_cap',
+              label: `Grid Cap ≤ ${lim.toFixed(2)} MW`,
+              formula: `P_grid(t) ≤ ${lim.toFixed(2)} MW  ∀ t ∈ [${stepToHHMM(startStep)}, ${stepToHHMM(endStep)})`,
+              startStep,
+              endStep,
+              limitValue: lim,
+              rawText: raw
+            };
+          }
+        } else {
+          if (lower.includes('storage') || lower.includes('soc') || lower.includes('inspection') || pctMatch) {
+            const limPct = clamp(pctMatch ? Number(pctMatch[1]) : 70, 25, 95);
+            return {
+              valid: true,
+              type: 'storage_cap',
+              label: `Heat Storage ≤ ${limPct}%`,
+              formula: `SoC_hs(t) ≤ ${limPct}%  ∀ t ∈ [${stepToHHMM(startStep)}, ${stepToHHMM(endStep)})`,
+              startStep,
+              endStep,
+              limitValue: limPct / 100,
+              rawText: raw
+            };
+          }
+          if (lower.includes('chp') || lower.includes('redispatch') || mwMatch) {
+            const lim = clamp(mwMatch ? Number(mwMatch[1]) : 30, 20, 50);
+            if (!rangeMatch && !untilMatch) { startStep = 64; endStep = 80; }
+            return {
+              valid: true,
+              type: 'chp_cap',
+              label: `CHP Cap ≤ ${lim.toFixed(0)} MW_el`,
+              formula: `P_chp(t) ≤ ${lim.toFixed(0)} MW_el  ∀ t ∈ [${stepToHHMM(startStep)}, ${stepToHHMM(endStep)})`,
+              startStep,
+              endStep,
+              limitValue: lim,
+              rawText: raw
+            };
+          }
+        }
+
+        return {
+          valid: false,
+          type: 'none',
+          label: 'Unparsed Rule',
+          formula: 'Try: "cap import at 1.0 MW between 17:00 and 19:00"',
+          startStep: 0,
+          endStep: 0,
+          limitValue: 0,
+          rawText: raw
+        };
+      }
+
+      function controllerKnowsRule(archId) {
+        if (state.scenario !== 'S4' || !state.ruleActive || !state.parsedRule || !state.parsedRule.valid) {
+          return false;
+        }
+        if (archId === 'llm_only' || archId === 'llm_wm_mpc' || archId === 'full_triad') return true;
+        if (archId === 'classical_mpc' && state.baselineRuleEncoded) return true;
+        return false; // Arch 2 (no rule channel) & Arch 4 (stale RL) ignore S4 rules
+      }
+
+      /* -----------------------------------------------------------------------
+         6. 2D BELLMAN VALUE ITERATION V(t, SoC) FOR RL CRITIC (ARCH 4 & 5)
+         ----------------------------------------------------------------------- */
+      function normalizeValueGrid(grid) {
+        let minV = Infinity, maxV = -Infinity;
+        for (let t = 0; t <= STEPS; t++) {
+          for (let b = 0; b < SOC_BINS; b++) {
+            const v = grid[t][b];
+            if (v > -1e8) {
+              if (v < minV) minV = v;
+              if (v > maxV) maxV = v;
+            }
+          }
+        }
+        const span = Math.max(1e-3, maxV - minV);
+        return grid.map(row => row.map(v => (v <= -1e8 ? 0 : clamp((v - minV) / span, 0, 1))));
+      }
+
+      function computeRLValueGrid(caseId, respectRule) {
+        const nom = getNominalParams(caseId);
+        const grid = Array.from({ length: STEPS + 1 }, () => new Float64Array(SOC_BINS));
+        const rule = (respectRule && state.parsedRule && state.parsedRule.valid) ? state.parsedRule : null;
+
+        // Terminal reward at t = STEPS: 0 (all daily peaks are inside [0..96])
+        for (let b = 0; b < SOC_BINS; b++) {
+          grid[STEPS][b] = 0;
+        }
+
+        if (caseId === 'A') {
+          const actions = [-1.0, -0.5, 0, 0.5, 1.0]; // MW battery power (+ charge, - discharge)
+          for (let t = STEPS - 1; t >= 0; t--) {
+            const ex = getExogenous('A', t, false);
+            const estJobLoad = (t >= 32 && t < 56) ? 0.30 : 0.15;
+            const gridCap = (rule && rule.type === 'grid_cap' && t >= rule.startStep && t < rule.endStep)
+              ? rule.limitValue
+              : nom.gridLimit;
+
+            for (let b = 0; b < SOC_BINS; b++) {
+              const soc = binToSoc(b);
+              let best = -1e9;
+              for (const pBat of actions) {
+                const dSoC = pBat >= 0
+                  ? (pBat * nom.batEta * DT) / nom.batCap
+                  : (pBat / nom.batEta * DT) / nom.batCap;
+                const nextSoC = soc + dSoC;
+                if (nextSoC < SOC_MIN - 1e-4 || nextSoC > SOC_MAX + 1e-4) continue;
+                const netGrid = Math.max(0, ex.baseLoad + estJobLoad + 0.22 + pBat - ex.pv);
+                let stepVal = -netGrid * ex.price * DT;
+                if (netGrid > gridCap) stepVal -= (netGrid - gridCap) * 450;
+                const nb = socToBin(nextSoC);
+                const cand = stepVal + 0.999 * grid[t + 1][nb];
+                if (cand > best) best = cand;
+              }
+              grid[t][b] = best;
+            }
+          }
+        } else {
+          // Case B: CHP dispatch + heat storage Bellman backup
+          const chpLevels = [0, 20, 30, 40, 50];
+          for (let t = STEPS - 1; t >= 0; t--) {
+            const ex = getExogenous('B', t, false);
+            const chpMax = (rule && rule.type === 'chp_cap' && t >= rule.startStep && t < rule.endStep)
+              ? rule.limitValue
+              : nom.chpPelMax;
+            const socMaxAllowed = (rule && rule.type === 'storage_cap' && t >= rule.startStep && t < rule.endStep)
+              ? rule.limitValue
+              : SOC_MAX;
+
+            for (let b = 0; b < SOC_BINS; b++) {
+              const soc = binToSoc(b);
+              if (soc > socMaxAllowed + 0.03) {
+                grid[t][b] = -1e6 + grid[t + 1][socToBin(socMaxAllowed)];
+                continue;
+              }
+              let best = -1e9;
+              for (const pel of chpLevels) {
+                if (pel > chpMax) continue;
+                const qChp = pel * nom.chpRatio;
+                for (let bNext = 0; bNext < SOC_BINS; bNext++) {
+                  const nextSoc = binToSoc(bNext);
+                  if (nextSoc > socMaxAllowed + 1e-4) continue;
+                  const pHs = ((nextSoc - soc * (1 - nom.hsLoss)) * nom.hsCap) / DT; // + charge, - discharge
+                  if (Math.abs(pHs) > nom.hsPmax + 1e-3) continue;
+                  const qBoil = Math.max(0, ex.heatDemand + pHs - qChp);
+                  if (qBoil > nom.boilMax + 1e-3) continue;
+                  const stepMargin = (pel * (ex.price - nom.chpFuelCost) - qBoil * nom.boilCost) * DT;
+                  const cand = stepMargin + 0.998 * grid[t + 1][bNext];
+                  if (cand > best) best = cand;
+                }
+              }
+              grid[t][b] = best;
+            }
+          }
+        }
+        return grid;
+      }
+
+      function rebuildRLValueGrids() {
+        state.valueGridStale = computeRLValueGrid(state.caseId, false);
+        state.valueGridSafe = computeRLValueGrid(state.caseId, true);
+        state.valueNormStale = normalizeValueGrid(state.valueGridStale);
+        state.valueNormSafe = normalizeValueGrid(state.valueGridSafe);
+      }
+
+      function sampleRLValue(grid, t, soc) {
+        const tt = clamp(Math.round(t), 0, STEPS);
+        const fBin = clamp(((soc - SOC_MIN) / (SOC_MAX - SOC_MIN)) * (SOC_BINS - 1), 0, SOC_BINS - 1.001);
+        const b0 = Math.floor(fBin);
+        const frac = fBin - b0;
+        return grid[tt][b0] * (1 - frac) + grid[tt][b0 + 1] * frac;
+      }
+
+      /* -----------------------------------------------------------------------
+         7. ONLINE RECURSIVE LEAST SQUARES (RLS) FOR LEARNED WORLD MODEL (ARCH 2-5)
+         ----------------------------------------------------------------------- */
+      function resetRLS() {
+        const nomA = getNominalParams('A');
+        const nomB = getNominalParams('B');
+        state.rls = {
+          batCapEst: nomA.batCap,
+          batEtaEst: nomA.batEta,
+          thCapEst: nomA.thCap,
+          thLossEst: nomA.thLoss,
+          hsCapEst: nomB.hsCap,
+          hsLossEst: nomB.hsLoss,
+          boilCapEst: nomB.boilMax,
+          samples: 0
+        };
+      }
+
+      function updateRLS(obs) {
+        // Fast damped recursive least-squares parameter tracking on observed plant transitions
+        const gain = state.rls.samples < 4 ? 0.55 : 0.35;
+        state.rls.samples++;
+
+        if (state.caseId === 'A') {
+          const { pBatActual, dBatSoC, pEbActual, qHeatDem, dThSoC, thSoCPrev } = obs;
+          if (Math.abs(pBatActual) > 0.08 && Math.abs(dBatSoC) > 1e-4) {
+            const nomEta = getNominalParams('A').batEta;
+            const impliedCap = pBatActual >= 0
+              ? (pBatActual * state.rls.batEtaEst * DT) / Math.max(1e-4, dBatSoC)
+              : (Math.abs(pBatActual) / state.rls.batEtaEst * DT) / Math.max(1e-4, -dBatSoC);
+            if (impliedCap > 0.8 && impliedCap < 3.0) {
+              state.rls.batCapEst = clamp(state.rls.batCapEst * (1 - gain) + impliedCap * gain, 1.0, 2.5);
+            }
+            if (state.scenario === 'S2' && state.mismatchPct > 0) {
+              const trueEta = getTrueParams('A').batEta;
+              state.rls.batEtaEst = state.rls.batEtaEst * (1 - gain) + trueEta * gain;
+            } else {
+              state.rls.batEtaEst = nomEta;
+            }
+          }
+          const qIn = pEbActual * 1.5 - qHeatDem;
+          const netThObs = (thSoCPrev - dThSoC); // actual change
+          if (Math.abs(qIn) > 0.05 && Math.abs(dThSoC) > 1e-4) {
+            const impliedThCap = (qIn * DT) / Math.max(1e-4, dThSoC + state.rls.thLossEst * thSoCPrev);
+            if (impliedThCap > 1.2 && impliedThCap < 4.5) {
+              state.rls.thCapEst = clamp(state.rls.thCapEst * (1 - gain * 0.6) + impliedThCap * (gain * 0.6), 1.4, 3.6);
+            }
+          }
+          if (state.scenario === 'S2' && state.mismatchPct > 0) {
+            const trueLoss = getTrueParams('A').thLoss;
+            state.rls.thLossEst = state.rls.thLossEst * (1 - gain) + trueLoss * gain;
+          }
+        } else {
+          const { qHsActual, dHsSoC, hsSoCPrev, qBoilCmd, qBoilActual } = obs;
+          if (Math.abs(qHsActual) > 3 && Math.abs(dHsSoC) > 1e-4) {
+            const impliedHsCap = (qHsActual * DT) / (dHsSoC + state.rls.hsLossEst * hsSoCPrev);
+            if (impliedHsCap > 180 && impliedHsCap < 500) {
+              state.rls.hsCapEst = clamp(state.rls.hsCapEst * (1 - gain) + impliedHsCap * gain, 200, 450);
+            }
+          }
+          if (state.scenario === 'S2' && state.mismatchPct > 0) {
+            state.rls.hsLossEst = state.rls.hsLossEst * (1 - gain) + getTrueParams('B').hsLoss * gain;
+          }
+          if (qBoilCmd > qBoilActual + 0.5) {
+            state.rls.boilCapEst = clamp(state.rls.boilCapEst * (1 - 0.65) + qBoilActual * 0.65, 18, 40);
+          }
+        }
+      }
+
+      /* -----------------------------------------------------------------------
+         8. SCENARIO & PLANT RESET
+         ----------------------------------------------------------------------- */
+      function initJobsA() {
+        return [
+          { id: 'furnace', name: 'Furnace batch', power: 0.60, dur: 12, winStart: 0, winEnd: 72, rem: 12, active: false, plannedStart: 44 },
+          { id: 'paint',   name: 'Paint line',    power: 0.40, dur: 16, winStart: 24, winEnd: 80, rem: 16, active: false, plannedStart: 40 },
+          { id: 'precool', name: 'Pre-cooling',   power: 0.30, dur: 8,  winStart: 0, winEnd: 56, rem: 8,  active: false, plannedStart: 44 },
+          { id: 'air',     name: 'Air buffer',    power: 0.20, dur: 8,  winStart: 0, winEnd: 92, rem: 8,  active: false, plannedStart: 48 }
+        ];
+      }
+
+      function setupDay(resetDayCount = true) {
+        if (resetDayCount) state.dayCount = 1;
+        state.step = 0;
+        state.endPauseTicks = 0;
+        state.outageTimer = 0;
+        state.twinReparamDone = false;
+        state.twinReparamTimer = 0;
+        state.baselineRuleEncoded = false;
+        state.encodeTimer = 0;
+        state.ruleActive = (state.scenario === 'S4' && state.step >= state.ruleInjectStep);
+
+        state.batSoC = state.scenario === 'S2' ? 0.16 : 0.30;
+        state.thSoC = 0.35;
+        state.hsSoC = state.scenario === 'S3' ? 0.18 : (state.scenario === 'S2' ? 0.30 : 0.72);
+        state.chpOn = true;
+        state.chpPel = 35;
+        state.jobs = initJobsA();
+
+        resetRLS();
+        state.history = [];
+        state.plannedJobs = {};
+        state.plannedChp = [];
+        state.mpcRollouts = [];
+        state.bestRollout = null;
+
+        state.energyCost = 0;
+        state.peakImportKw = 0;
+        state.netMargin = 0;
+        state.chpStarts = 0;
+        state.unmetHeatMwh = 0;
+        state.limitViolations = 0;
+        state.ruleViolations = 0;
+        state.deadlineMisses = 0;
+        state.computeMetric = 0;
+        state.latencyMs = 4;
+        state.statusLabel = 'Simulating Day';
+        state.statusTone = 'neutral';
+        state.llmLog = 'Monitoring plant state...';
+
+        state.parsedRule = parseNaturalRule(state.ruleText, state.caseId);
+        rebuildRLValueGrids();
+        updateAllUI();
+      }
+
+      /* -----------------------------------------------------------------------
+         9. CONTROLLERS (0..5) FOR CASE A & CASE B
+         ----------------------------------------------------------------------- */
+      function getRemainingJobScheduleA(t, horizonSteps, model, gridCapFn, furnaceLockFn, targetPriceWindow) {
+        // Compute planned job power per step [0..horizonSteps-1] and immediate starts at t
+        const jobPower = new Float64Array(horizonSteps);
+        const startNow = {};
+        const planned = {};
+
+        for (const j of state.jobs) {
+          planned[j.id] = [];
+          if (j.rem <= 0) { startNow[j.id] = false; continue; }
+          if (j.active) {
+            const locked = j.id === 'furnace' && ((state.outageTimer > 0) || furnaceLockFn(t));
+            startNow[j.id] = !locked;
+            let left = j.rem;
+            for (let k = 0; k < horizonSteps && left > 0; k++) {
+              if (j.id === 'furnace' && furnaceLockFn(t + k)) continue;
+              jobPower[k] += j.power;
+              planned[j.id].push(t + k);
+              left--;
+            }
+            continue;
+          }
+
+          // Pick best start slot within valid window [max(t, winStart) .. winEnd - rem]
+          const earliest = Math.max(t, j.winStart);
+          const latest = Math.min(STEPS - j.rem, j.winEnd - j.rem);
+          if (latest < earliest) { startNow[j.id] = false; continue; }
+
+          let bestS = earliest;
+          let bestScore = Infinity;
+          for (let s = earliest; s <= latest; s++) {
+            let sc = 0;
+            let valid = true;
+            for (let k = 0; k < j.rem; k++) {
+              const tt = s + k;
+              if (j.id === 'furnace' && furnaceLockFn(tt)) { valid = false; break; }
+              const ex = getExogenous('A', tt, true);
+              const existing = (tt - t < horizonSteps) ? jobPower[tt - t] : 0;
+              const estLoad = ex.baseLoad + existing + j.power + 0.22 - ex.pv;
+              const cap = gridCapFn(tt);
+              sc += Math.max(0, estLoad) * ex.price * DT;
+              if (estLoad > cap - 0.15) sc += (estLoad - (cap - 0.15)) * 750;
+              if (targetPriceWindow && tt >= 76 && tt < 84) sc += 35;
+            }
+            if (valid && sc < bestScore) {
+              bestScore = sc;
+              bestS = s;
+            }
+          }
+          startNow[j.id] = (bestS === t);
+          for (let k = 0; k < j.rem; k++) {
+            const tt = bestS + k;
+            if (tt - t >= 0 && tt - t < horizonSteps) {
+              jobPower[tt - t] += j.power;
+              planned[j.id].push(tt);
+            }
+          }
+        }
+        return { jobPower, startNow, planned };
+      }
+
+      function getControllerConstraints(archId) {
+        const knows = controllerKnowsRule(archId);
+        const rule = knows ? state.parsedRule : null;
+        return {
+          knows,
+          rule,
+          gridCapFn: (tt) => (rule && rule.type === 'grid_cap' && tt >= rule.startStep && tt < rule.endStep)
+            ? rule.limitValue : 1.50,
+          furnaceLockFn: (tt) => (rule && rule.type === 'furnace_lockout' && tt >= rule.startStep && tt < rule.endStep),
+          chpCapFn: (tt) => (rule && rule.type === 'chp_cap' && tt >= rule.startStep && tt < rule.endStep)
+            ? rule.limitValue : 50,
+          hsCapFn: (tt) => (rule && rule.type === 'storage_cap' && tt >= rule.startStep && tt < rule.endStep)
+            ? rule.limitValue : SOC_MAX
+        };
+      }
+
+      // --- ARCH 0: Classical MPC (MILP-type stylized DP solver on nominal/re-param twin) ---
+      function solveClassicalDP(t) {
+        const H = clamp(state.horizonHours * 4, 4, 48);
+        const hEff = Math.min(H, STEPS - t);
+        const twin = getTwinParams(state.caseId);
+        const cons = getControllerConstraints('classical_mpc');
+
+        if (state.caseId === 'A') {
+          const sched = getRemainingJobScheduleA(t, hEff, twin, cons.gridCapFn, cons.furnaceLockFn, true);
+          state.plannedJobs = sched.planned;
+
+          // Discretised DP over Battery SoC x hEff
+          const actions = [-1.0, -0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75, 1.0];
+          const V = Array.from({ length: hEff + 1 }, () => new Float64Array(SOC_BINS).fill(1e9));
+          const pol = Array.from({ length: hEff }, () => new Float32Array(SOC_BINS));
+          for (let b = 0; b < SOC_BINS; b++) V[hEff][b] = 0; // Myopic beyond H!
+
+          let nodes = 0;
+          for (let k = hEff - 1; k >= 0; k--) {
+            const tt = t + k;
+            const ex = getExogenous('A', tt, true);
+            const ebNeed = Math.min(twin.ebPmax, (ex.heatDemand / twin.ebCop) + (state.thSoC < 0.25 && k === 0 ? 0.20 : 0));
+            const cap = cons.gridCapFn(tt);
+            for (let b = 0; b < SOC_BINS; b++) {
+              const soc = binToSoc(b);
+              let bestC = 1e9, bestA = 0;
+              for (const pBat of actions) {
+                nodes++;
+                const dSoC = pBat >= 0 ? (pBat * twin.batEta * DT) / twin.batCap : (pBat / twin.batEta * DT) / twin.batCap;
+                const nSoc = soc + dSoC;
+                if (nSoc < SOC_MIN - 1e-4 || nSoc > SOC_MAX + 1e-4) continue;
+                const netGrid = Math.max(0, ex.baseLoad + sched.jobPower[k] + ebNeed + pBat - ex.pv);
+                let c = netGrid * ex.price * DT;
+                if (netGrid > cap) c += (netGrid - cap) * 900 + 120;
+                const nb = socToBin(nSoc);
+                const tot = c + V[k + 1][nb];
+                if (tot < bestC) { bestC = tot; bestA = pBat; }
+              }
+              V[k][b] = bestC;
+              pol[k][b] = bestA;
+            }
+          }
+
+          // Roll out best DP trajectory + 6 sample deviations for visualization
+          const rollouts = [];
+          const bestPts = [{ t, soc: state.batSoC }];
+          let s = state.batSoC;
+          for (let k = 0; k < hEff; k++) {
+            const a = pol[k][socToBin(s)];
+            const dSoC = a >= 0 ? (a * twin.batEta * DT) / twin.batCap : (a / twin.batEta * DT) / twin.batCap;
+            s = clamp(s + dSoC, SOC_MIN, SOC_MAX);
+            bestPts.push({ t: t + k + 1, soc: s });
+          }
+          for (let r = -3; r <= 3; r++) {
+            if (r === 0) continue;
+            const pts = [{ t, soc: state.batSoC }];
+            let rs = state.batSoC;
+            for (let k = 0; k < hEff; k++) {
+              const a = clamp(pol[k][socToBin(rs)] + r * 0.25, -1, 1);
+              const dSoC = a >= 0 ? (a * twin.batEta * DT) / twin.batCap : (a / twin.batEta * DT) / twin.batCap;
+              rs = clamp(rs + dSoC, SOC_MIN, SOC_MAX);
+              pts.push({ t: t + k + 1, soc: rs });
+            }
+            rollouts.push({ pts, cost: Math.abs(r) });
+          }
+          state.mpcRollouts = rollouts;
+          state.bestRollout = bestPts;
+
+          // Steep MILP-equivalent node scaling with H
+          if (state.scenario === 'S2' && !state.twinReparamDone && state.caseId === 'B') {
+          // Nominal twin under-estimates storage loss and assumes 40 MW_th boiler, so it skips early charging
+        }
+        const milpNodes = Math.round(nodes * Math.pow(H / 16, 1.35));
+          state.computeMetric = milpNodes;
+          state.computeUnit = 'nodes';
+          state.latencyMs = Math.round(6 + Math.pow(H / 4, 2.05) * 3.2);
+
+          const pBat0 = pol[0][socToBin(state.batSoC)];
+          const ex0 = getExogenous('A', t, true);
+          const pEb0 = clamp(ex0.heatDemand / twin.ebCop + (state.thSoC < 0.30 ? 0.15 : 0), 0, twin.ebPmax);
+          if (state.scenario === 'S2' && !state.twinReparamDone) {
+            return { pBat: pBat0, pEb: pEb0, startNow: sched.startNow };
+          }
+          const cap0 = cons.gridCapFn(t);
+          const maxChg0 = ((SOC_MAX - state.batSoC) * twin.batCap) / (twin.batEta * DT);
+          const maxDis0 = ((state.batSoC - SOC_MIN) * twin.batCap * twin.batEta) / DT;
+          const loadNoBat = ex0.baseLoad + sched.jobPower[0] + pEb0 - ex0.pv;
+          const pBatSafe = clamp(pBat0, -Math.min(1.0, maxDis0), Math.min(1.0, maxChg0, cap0 - loadNoBat));
+          return { pBat: pBatSafe, pEb: pEb0, startNow: sched.startNow };
+        }
+
+        // Case B: DP over Heat Storage SoC x hEff with CHP setpoint enumeration
+        const chpLevels = [0, 20, 25, 30, 35, 40, 45, 50];
+        const V = Array.from({ length: hEff + 1 }, () => new Float64Array(SOC_BINS).fill(-1e9));
+        const polPel = Array.from({ length: hEff }, () => new Float32Array(SOC_BINS));
+        const polBoil = Array.from({ length: hEff }, () => new Float32Array(SOC_BINS));
+        for (let b = 0; b < SOC_BINS; b++) V[hEff][b] = 0;
+
+        let nodes = 0;
+        for (let k = hEff - 1; k >= 0; k--) {
+          const tt = t + k;
+          const ex = getExogenous('B', tt, true);
+          const chpMax = cons.chpCapFn(tt);
+          const socMaxAllowed = cons.hsCapFn(tt);
+          for (let b = 0; b < SOC_BINS; b++) {
+            const soc = binToSoc(b);
+            let bestVal = -1e9, bestP = 20, bestQ = 0;
+            for (const pel of chpLevels) {
+              if (pel > chpMax) continue;
+              if (k === 0) {
+                if (state.outageTimer > 0 && pel > 0) continue;
+                if (state.chpOn && pel > 0 && Math.abs(pel - state.chpPel) > twin.chpRamp) continue;
+                if (!state.chpOn && pel > twin.chpPelMin) continue;
+              }
+              // Keep CHP online in DP when night heat demand is significant to avoid ramp starvation at morning peak
+              const qChp = pel * twin.chpRatio;
+              const startPen = (k === 0 && !state.chpOn && pel > 0) ? twin.chpStartCost : 0;
+              const boilOpts = [0, 10, 20, Math.min(30, twin.boilMax), twin.boilMax];
+              for (const qBoil of boilOpts) {
+                nodes++;
+                const availDis = Math.min(twin.hsPmax, Math.max(0, (soc - SOC_MIN) * twin.hsCap / DT));
+                const availChg = Math.min(twin.hsPmax, Math.max(0, (socMaxAllowed - soc * (1 - twin.hsLoss)) * twin.hsCap / DT));
+                const netQ = qChp + qBoil - ex.heatDemand;
+                let pHs = 0, unmet = 0;
+                if (netQ >= 0) {
+                  pHs = Math.min(netQ, availChg);
+                } else {
+                  const dis = Math.min(-netQ, availDis);
+                  pHs = -dis;
+                  unmet = Math.max(0, -netQ - dis);
+                }
+                const nSoc = clamp(soc * (1 - twin.hsLoss) + (pHs * DT) / twin.hsCap, SOC_MIN, SOC_MAX);
+                if (nSoc > socMaxAllowed + 0.015) continue;
+                const resPen = (state.scenario === 'S1' && ex.heatDemand < 85 && nSoc < 0.25) ? (0.25 - nSoc) * 15000 : 0;
+                const stepM = (pel * (ex.price - twin.chpFuelCost) - qBoil * twin.boilCost) * DT - startPen - unmet * 500 - resPen;
+                const nb = socToBin(nSoc);
+                const tot = stepM + V[k + 1][nb];
+                if (tot > bestVal) { bestVal = tot; bestP = pel; bestQ = qBoil; }
+              }
+            }
+            V[k][b] = bestVal;
+            polPel[k][b] = bestP;
+            polBoil[k][b] = bestQ;
+          }
+        }
+
+        const bestPts = [{ t, soc: state.hsSoC }];
+        const plannedChp = [];
+        let s = state.hsSoC;
+        for (let k = 0; k < hEff; k++) {
+          const pel = polPel[k][socToBin(s)];
+          const qBoil = polBoil[k][socToBin(s)];
+          plannedChp.push({ t: t + k, pel, qBoil });
+          const exk = getExogenous('B', t + k, true);
+          const pHs = clamp(pel * twin.chpRatio + qBoil - exk.heatDemand, -twin.hsPmax, twin.hsPmax);
+          s = clamp(s * (1 - twin.hsLoss) + (pHs * DT) / twin.hsCap, SOC_MIN, SOC_MAX);
+          bestPts.push({ t: t + k + 1, soc: s });
+        }
+        state.plannedChp = plannedChp;
+        state.bestRollout = bestPts;
+        state.mpcRollouts = [-2, -1, 1, 2].map(d => ({
+          pts: bestPts.map((p, idx) => ({ t: p.t, soc: clamp(p.soc + d * 0.015 * Math.sqrt(idx), SOC_MIN, SOC_MAX) })),
+          cost: Math.abs(d)
+        }));
+
+        if (state.scenario === 'S2' && !state.twinReparamDone && state.caseId === 'B') {
+          // Nominal twin under-estimates storage loss and assumes 40 MW_th boiler, so it skips early charging
+        }
+        const milpNodes = Math.round(nodes * Math.pow(H / 16, 1.35));
+        state.computeMetric = milpNodes;
+        state.computeUnit = 'nodes';
+        state.latencyMs = Math.round(8 + Math.pow(H / 4, 2.05) * 3.8);
+
+        const b0 = socToBin(state.hsSoC);
+        return { pel: polPel[0][b0], qBoil: polBoil[0][b0] };
+      }
+
+      // --- ARCH 1: LLM Only (Emulated heuristic policy, obeys S4 text, breaks physical constraints) ---
+      function stepLLMOnly(t) {
+        state.mpcRollouts = [];
+        state.bestRollout = null;
+        state.computeMetric = 0;
+        state.computeUnit = 'rollouts';
+        state.latencyMs = 24;
+        const cons = getControllerConstraints('llm_only');
+
+        if (state.caseId === 'A') {
+          const ex = getExogenous('A', t, true);
+          const startNow = {};
+          const planned = {};
+          for (const j of state.jobs) {
+            planned[j.id] = [];
+            if (j.rem <= 0) { startNow[j.id] = false; continue; }
+            if (j.id === 'furnace' && cons.furnaceLockFn(t)) {
+              startNow[j.id] = false;
+              continue;
+            }
+            // Coarse heuristic: launch jobs whenever midday or price < 150, ignoring peak overlap!
+            const trigger = j.active || (ex.price < 150 && t >= j.winStart && t >= 28);
+            startNow[j.id] = trigger;
+            if (trigger) {
+              for (let k = 0; k < j.rem && t + k < STEPS; k++) planned[j.id].push(t + k);
+            }
+          }
+          state.plannedJobs = planned;
+
+          // Coarse heuristic battery command without power/SoC balance verification
+          let pBat = 0;
+          if (ex.price < 85 || ex.pv > 0.65) pBat = 0.85;
+          else if (ex.price >= 180) pBat = -0.85;
+
+          if (cons.knows && cons.rule.type === 'grid_cap' && t >= cons.rule.startStep && t < cons.rule.endStep) {
+            pBat = -0.75; // Obeys S4 rule intent qualitatively
+            state.llmLog = `Rule active: discharging 0.75 MW to respect ${cons.rule.limitValue.toFixed(1)} MW cap.`;
+          } else {
+            state.llmLog = ex.price >= 180
+              ? 'Heuristic: "Peak price -> discharge battery 0.85 MW"'
+              : 'Heuristic: "Run flexible jobs & charge when price < 150 €/MWh"';
+          }
+          return { pBat, pEb: 0.45, startNow };
+        }
+
+        // Case B LLM heuristic: ignores ramp limits and storage balance
+        const ex = getExogenous('B', t, true);
+        let pel = ex.price > 110 ? 50 : (ex.heatDemand > 70 ? 45 : 22);
+        if (cons.knows && cons.rule.type === 'chp_cap' && t >= cons.rule.startStep && t < cons.rule.endStep) {
+          pel = Math.min(pel, cons.rule.limitValue);
+          state.llmLog = `Rule active: capping CHP at ${cons.rule.limitValue} MW_el per redispatch.`;
+        } else if (cons.knows && cons.rule.type === 'storage_cap' && state.hsSoC > cons.rule.limitValue - 0.04) {
+          pel = 20;
+          state.llmLog = `Rule active: throttling CHP to respect ${Math.round(cons.rule.limitValue * 100)}% storage cap.`;
+        } else {
+          state.llmLog = `Heuristic: "Set CHP=${pel} MW_el, boiler=${ex.heatDemand > 75 ? 25 : 0} MW_th"`;
+        }
+        const qBoil = ex.heatDemand > 75 ? 25 : 0;
+        state.plannedChp = [{ t, pel, qBoil }];
+        return { pel, qBoil };
+      }
+
+      // --- ARCH 2, 3, 4, 5: Smooth Block-CEM / TD-MPC2 Hybrid Optimizer on Learned RLS WM ---
+      function runCEMController(archId, t) {
+        const isRL = archId === 'wm_rl_mpc' || archId === 'full_triad';
+        const hasLLM = archId === 'llm_wm_mpc' || archId === 'full_triad';
+        const H = clamp(state.horizonHours * 4, 4, 48);
+        const hEff = Math.min(H, STEPS - t);
+        const wm = getLearnedParams(state.caseId);
+        const cons = getControllerConstraints(archId);
+        const rlGrid = archId === 'full_triad' ? state.valueGridSafe : state.valueGridStale;
+
+        const numRollouts = archId === 'wm_rl_mpc' ? 16 : (archId === 'full_triad' ? 18 : 64);
+        const baseLat = isRL ? 9 : 26;
+        state.computeMetric = numRollouts;
+        state.computeUnit = 'rollouts';
+        state.latencyMs = Math.round(baseLat + (H / 16) * (isRL ? 2 : 6));
+
+        // 4 piecewise-constant blocks over hEff
+        const B = 4;
+        if (state.caseId === 'A') {
+          const sched = getRemainingJobScheduleA(t, hEff, wm, cons.gridCapFn, cons.furnaceLockFn, hasLLM || isRL);
+          state.plannedJobs = sched.planned;
+
+          // S3 LLM semantic subgoal: pre-charge battery before distant 17:00 evening peak
+          const llmPrecharge = hasLLM && t >= 36 && t < 68 && state.batSoC < 0.85;
+          if (hasLLM) {
+            state.llmLog = cons.knows
+              ? `Injected rule: ${cons.rule.formula}`
+              : (llmPrecharge ? 'Subgoal active: Charge battery ≥ 80% before 17:00 peak.' : 'Supervising RLS World Model + MPC.');
+          }
+
+          let mu = new Array(B).fill(0);
+          let sig = new Array(B).fill(0.75);
+          if (isRL) {
+            // Actor warm-start from V(t, SoC) gradient (only bias strongly when marginal V > current price)
+            const exNow = getExogenous('A', t, true);
+            const vUp = sampleRLValue(rlGrid, t + 1, clamp(state.batSoC + 0.08, SOC_MIN, SOC_MAX));
+            const vDn = sampleRLValue(rlGrid, t + 1, clamp(state.batSoC - 0.08, SOC_MIN, SOC_MAX));
+            const margPrice = (vUp - vDn) / Math.max(0.05, 0.16 * wm.batCap);
+            const bias = margPrice > exNow.price * 0.95 ? 0.65 : (exNow.price > 180 ? -0.65 : 0);
+            mu = [bias, bias * 0.7, 0, 0];
+            sig = [0.60, 0.60, 0.70, 0.70];
+          } else if (llmPrecharge) {
+            mu = [0.65, 0.55, 0.35, 0.1];
+          }
+
+          let finalRollouts = [];
+          let bestTraj = null;
+          let bestAct0 = 0;
+
+          // 3 CEM iterations; keep last iteration's rollouts for visualization
+          for (let iter = 0; iter < 3; iter++) {
+            const cands = [];
+            for (let r = 0; r < numRollouts; r++) {
+              const blocks = [];
+              for (let b = 0; b < B; b++) {
+                // Deterministic quasi-random spread + exploratory wings for TD-MPC2 safety
+                const u = ((r + 0.5) / numRollouts) * 2 - 1;
+                const phase = Math.sin((r + 1) * (b + 1) * 1.7 + iter * 2.3);
+                const wide = (isRL && r >= numRollouts - 4) ? 1.55 : 1.0;
+                blocks.push(clamp(mu[b] + sig[b] * wide * (0.65 * u + 0.55 * phase), -1.0, 1.0));
+              }
+
+              let s = state.batSoC;
+              let cost = 0;
+              const pts = [{ t, soc: s }];
+              for (let k = 0; k < hEff; k++) {
+                const tt = t + k;
+                const blk = Math.min(B - 1, Math.floor((k / hEff) * B));
+                let pBat = blocks[blk];
+                // Enforce physical bounds in rollout evaluation
+                const maxChg = ((SOC_MAX - s) * wm.batCap) / (wm.batEta * DT);
+                const maxDis = ((s - SOC_MIN) * wm.batCap * wm.batEta) / DT;
+                pBat = clamp(pBat, -Math.min(1.0, maxDis), Math.min(1.0, maxChg));
+
+                const ex = getExogenous('A', tt, true);
+                const ebNeed = Math.min(wm.ebPmax, ex.heatDemand / wm.ebCop + (state.thSoC < 0.25 && k === 0 ? 0.2 : 0));
+                const netGrid = Math.max(0, ex.baseLoad + sched.jobPower[k] + ebNeed + pBat - ex.pv);
+                const cap = cons.gridCapFn(tt);
+
+                cost += netGrid * ex.price * DT;
+                if (netGrid > cap) cost += (netGrid - cap) * 900 + 120;
+                const dSoC = pBat >= 0 ? (pBat * wm.batEta * DT) / wm.batCap : (pBat / wm.batEta * DT) / wm.batCap;
+                s = clamp(s + dSoC, SOC_MIN, SOC_MAX);
+                pts.push({ t: tt + 1, soc: s });
+              }
+
+              // Terminal cost: RL Critic V(t+H, s_H) OR LLM subgoal OR myopic 0
+              if (isRL) {
+                cost -= sampleRLValue(rlGrid, t + hEff, s);
+              } else if (llmPrecharge) {
+                cost -= s * 160;
+              }
+              cands.push({ blocks, pts, cost });
+            }
+            cands.sort((a, b) => a.cost - b.cost);
+            const eliteCount = Math.max(3, Math.floor(numRollouts * 0.25));
+            for (let b = 0; b < B; b++) {
+              let m = 0;
+              for (let e = 0; e < eliteCount; e++) m += cands[e].blocks[b];
+              mu[b] = m / eliteCount;
+              sig[b] = Math.max(0.18, sig[b] * 0.55);
+            }
+            finalRollouts = cands;
+            bestTraj = cands[0].pts;
+            bestAct0 = cands[0].blocks[0];
+          }
+
+          state.mpcRollouts = finalRollouts;
+          state.bestRollout = bestTraj;
+          const ex0 = getExogenous('A', t, true);
+          const pEb0 = clamp(ex0.heatDemand / wm.ebCop + (state.thSoC < 0.30 ? 0.15 : 0), 0, wm.ebPmax);
+          const cap0 = cons.gridCapFn(t);
+          const maxChg0 = ((SOC_MAX - state.batSoC) * wm.batCap) / (wm.batEta * DT);
+          const maxDis0 = ((state.batSoC - SOC_MIN) * wm.batCap * wm.batEta) / DT;
+          const loadWithoutBat = ex0.baseLoad + sched.jobPower[0] + pEb0 - ex0.pv;
+          const pBatSafe = clamp(bestAct0, -Math.min(1.0, maxDis0), Math.min(1.0, maxChg0, cap0 - loadWithoutBat));
+          return { pBat: pBatSafe, pEb: pEb0, startNow: sched.startNow };
+        }
+
+        // Case B: CEM over CHP setpoint + Heat Storage dispatch
+        const llmPrechargeB = hasLLM && t >= 4 && t < 32 && state.hsSoC < 0.72;
+        if (hasLLM) {
+          state.llmLog = cons.knows
+            ? `Injected rule: ${cons.rule.formula}`
+            : (llmPrechargeB ? 'Subgoal active: Pre-charge heat storage ≥ 65% before 08:00 peak.' : 'Supervising RLS World Model + MPC.');
+        }
+
+        let mu = new Array(B).fill(35);
+        let sig = new Array(B).fill(18);
+        if (isRL) {
+          const vUp = sampleRLValue(rlGrid, t + 1, clamp(state.hsSoC + 0.06, SOC_MIN, SOC_MAX));
+          const vDn = sampleRLValue(rlGrid, t + 1, clamp(state.hsSoC - 0.06, SOC_MIN, SOC_MAX));
+          const targetP = vUp > vDn + 50 ? 48 : (vDn > vUp + 50 ? 22 : 35);
+          mu = [targetP, targetP, 35, 35];
+          sig = [14, 14, 16, 16];
+        } else if (llmPrechargeB) {
+          mu = [48, 48, 45, 40];
+        }
+
+        let finalRollouts = [];
+        let bestTraj = null;
+        let bestPel0 = 25;
+        let bestBoil0 = 0;
+
+        for (let iter = 0; iter < 2; iter++) {
+          const cands = [];
+          for (let r = 0; r < numRollouts; r++) {
+            const blocks = [];
+            for (let b = 0; b < B; b++) {
+              const u = ((r + 0.5) / numRollouts) * 2 - 1;
+              const phase = Math.sin((r + 1) * (b + 1) * 1.9 + iter * 2.1);
+              const wide = (isRL && r >= numRollouts - 4) ? 1.55 : 1.0;
+              blocks.push(clamp(mu[b] + sig[b] * wide * (0.65 * u + 0.55 * phase), 0, 50));
+            }
+
+            let s = state.hsSoC;
+            let curPel = state.chpPel;
+            let curOn = state.chpOn;
+            let cost = 0;
+            const pts = [{ t, soc: s }];
+            const trajChp = [];
+
+            for (let k = 0; k < hEff; k++) {
+              const tt = t + k;
+              const blk = Math.min(B - 1, Math.floor((k / hEff) * B));
+              const ex = getExogenous('B', tt, true);
+              const chpMax = cons.chpCapFn(tt);
+              const socMaxAllowed = cons.hsCapFn(tt);
+
+              let pel = blocks[blk];
+              if (k === 0 && state.outageTimer > 0) pel = 0;
+              else {
+                if (curOn) {
+                  const lo = Math.max(wm.chpPelMin, curPel - wm.chpRamp);
+                  const hi = Math.max(lo, Math.min(chpMax, curPel + wm.chpRamp));
+                  if (pel < 10 && curPel <= wm.chpPelMin + 2) pel = 0;
+                  else pel = clamp(pel, lo, hi);
+                } else {
+                  if (pel < 12) pel = 0;
+                  else { pel = Math.min(chpMax, wm.chpPelMin); cost += wm.chpStartCost; }
+                }
+              }
+              if (pel > chpMax + 0.2) cost += (pel - chpMax) * 1800;
+              curOn = pel > 0;
+              curPel = pel;
+
+              const qChp = pel * wm.chpRatio;
+              // Use storage first before firing expensive gas boiler (keep 2% buffer for loss rounding)
+              const availDis = Math.min(wm.hsPmax, Math.max(0, (s * (1 - wm.hsLoss) - SOC_MIN - 0.01) * wm.hsCap / DT));
+              const availChg = Math.min(wm.hsPmax, Math.max(0, (socMaxAllowed - s * (1 - wm.hsLoss)) * wm.hsCap / DT));
+              let pHs = 0;
+              let qBoil = 0;
+              const deficit = ex.heatDemand - qChp;
+              if (deficit > 0) {
+                const dis = Math.min(deficit, availDis);
+                pHs = -dis;
+                qBoil = Math.min(wm.boilMax, deficit - dis);
+              } else {
+                pHs = Math.min(-deficit, availChg);
+              }
+
+              const unmet = Math.max(0, ex.heatDemand - (qChp + qBoil - pHs));
+              const stepMargin = (pel * (ex.price - wm.chpFuelCost) - qBoil * wm.boilCost) * DT;
+              cost += -stepMargin + unmet * 500;
+              if (s > socMaxAllowed + 0.01) cost += (s - socMaxAllowed) * 25000;
+
+              s = clamp(s * (1 - wm.hsLoss) + (pHs * DT) / wm.hsCap, SOC_MIN, SOC_MAX);
+              pts.push({ t: tt + 1, soc: s });
+              trajChp.push({ t: tt, pel, qBoil });
+            }
+
+            if (isRL) {
+              cost -= sampleRLValue(rlGrid, t + hEff, s);
+            } else if (llmPrechargeB) {
+              cost -= s * 8000;
+            }
+            cands.push({ blocks, pts, cost, trajChp });
+          }
+
+          cands.sort((a, b) => a.cost - b.cost);
+          const eliteCount = Math.max(3, Math.floor(numRollouts * 0.25));
+          for (let b = 0; b < B; b++) {
+            let m = 0;
+            for (let e = 0; e < eliteCount; e++) m += cands[e].blocks[b];
+            mu[b] = m / eliteCount;
+            sig[b] = Math.max(4, sig[b] * 0.55);
+          }
+          finalRollouts = cands;
+          bestTraj = cands[0].pts;
+          bestPel0 = cands[0].trajChp[0].pel;
+          bestBoil0 = cands[0].trajChp[0].qBoil;
+          if (iter === 1) state.plannedChp = cands[0].trajChp;
+        }
+
+        state.mpcRollouts = finalRollouts;
+        state.bestRollout = bestTraj;
+        return { pel: bestPel0, qBoil: bestBoil0 };
+      }
+
+      /* -----------------------------------------------------------------------
+         10. PLANT SIMULATION STEP (GROUND-TRUTH PHYSICS)
+         ----------------------------------------------------------------------- */
+      function stepSimulation() {
+        if (state.step >= STEPS) {
+          if (state.endPauseTicks > 0) {
+            state.endPauseTicks--;
+            if (state.endPauseTicks === 0) {
+              state.dayCount++;
+              setupDay(false);
+            }
+          }
+          return;
+        }
+
+        const t = state.step;
+
+        // Handle engineer delay timers (S2 re-parametrisation & S4 manual constraint encoding)
+        if (state.twinReparamTimer > 0) {
+          state.twinReparamTimer--;
+          if (state.twinReparamTimer === 0) {
+            state.twinReparamDone = true;
+          }
+        }
+        if (state.encodeTimer > 0) {
+          state.encodeTimer--;
+          if (state.encodeTimer === 0) {
+            state.baselineRuleEncoded = true;
+          }
+        }
+
+        // Mid-day rule activation (S4)
+        if (state.scenario === 'S4' && t >= state.ruleInjectStep) {
+          state.ruleActive = true;
+        }
+
+        // Dispatch active architecture controller
+        let cmd;
+        switch (state.arch) {
+          case 'classical_mpc': cmd = solveClassicalDP(t); break;
+          case 'llm_only':      cmd = stepLLMOnly(t); break;
+          default:              cmd = runCEMController(state.arch, t); break;
+        }
+
+        const trueP = getTrueParams(state.caseId);
+        const ex = getExogenous(state.caseId, t, false);
+        const rule = (state.scenario === 'S4' && state.ruleActive && state.parsedRule && state.parsedRule.valid)
+          ? state.parsedRule : null;
+
+        if (state.caseId === 'A') {
+          // Execute jobs
+          let jobLoad = 0;
+          const activeNames = [];
+          for (const j of state.jobs) {
+            if (j.rem <= 0) continue;
+            const furnaceBroken = j.id === 'furnace' && state.outageTimer > 0;
+            if (furnaceBroken) {
+              // Forced breakdown pause
+              continue;
+            }
+            if (cmd.startNow[j.id] && (j.active || t >= j.winStart)) {
+              j.active = true;
+            }
+            if (j.active) {
+              jobLoad += j.power;
+              activeNames.push(j.id);
+              j.rem--;
+              if (j.rem === 0) j.active = false;
+              // S4 Furnace maintenance violation check
+              if (j.id === 'furnace' && rule && rule.type === 'furnace_lockout' && t >= rule.startStep && t < rule.endStep) {
+                state.ruleViolations++;
+              }
+            }
+            if (t + 1 === j.winEnd && j.rem > 0) {
+              state.deadlineMisses++;
+            }
+          }
+
+          // Execute Battery & Thermal Storage against TRUE plant physics
+          const batPrev = state.batSoC;
+          let pBatActual = cmd.pBat;
+          if (pBatActual >= 0) {
+            const maxChg = ((SOC_MAX - batPrev) * trueP.batCap) / (trueP.batEta * DT);
+            pBatActual = Math.min(pBatActual, trueP.batPmax, maxChg);
+            state.batSoC = clamp(batPrev + (pBatActual * trueP.batEta * DT) / trueP.batCap, SOC_MIN, SOC_MAX);
+          } else {
+            const maxDis = ((batPrev - SOC_MIN) * trueP.batCap * trueP.batEta) / DT;
+            const reqDis = Math.min(-pBatActual, trueP.batPmax);
+            const actDis = Math.min(reqDis, maxDis);
+            pBatActual = -actDis;
+            state.batSoC = clamp(batPrev - (actDis / trueP.batEta * DT) / trueP.batCap, SOC_MIN, SOC_MAX);
+          }
+
+          const thPrev = state.thSoC;
+          const pEbActual = clamp(cmd.pEb, 0, trueP.ebPmax);
+          const qNetTh = pEbActual * trueP.ebCop - ex.heatDemand;
+          state.thSoC = clamp(thPrev * (1 - trueP.thLoss) + (qNetTh * DT) / trueP.thCap, SOC_MIN, SOC_MAX);
+
+          // Actual grid import (shortfall if battery couldn't deliver nominal discharge pushes grid up!)
+          const gridImport = Math.max(0, ex.baseLoad + jobLoad + pEbActual + pBatActual - ex.pv);
+          state.energyCost += gridImport * ex.price * DT;
+          const impKw = Math.round(gridImport * 1000);
+          if (impKw > state.peakImportKw) state.peakImportKw = impKw;
+
+          // Limit & S4 rule checks
+          if (gridImport > trueP.gridLimit + 0.015) {
+            state.limitViolations++;
+          }
+          if (rule && rule.type === 'grid_cap' && t >= rule.startStep && t < rule.endStep && gridImport > rule.limitValue + 0.015) {
+            state.ruleViolations++;
+          }
+
+          // Update online RLS estimator
+          updateRLS({
+            pBatActual,
+            dBatSoC: state.batSoC - batPrev,
+            pEbActual,
+            qHeatDem: ex.heatDemand,
+            dThSoC: state.thSoC - thPrev,
+            thSoCPrev: thPrev
+          });
+
+          state.history.push({
+            t,
+            price: ex.price,
+            pv: ex.pv,
+            baseLoad: ex.baseLoad,
+            jobLoad,
+            pEb: pEbActual,
+            pBat: pBatActual,
+            gridImport,
+            batSoC: state.batSoC,
+            thSoC: state.thSoC,
+            activeJobs: activeNames,
+            outage: state.outageTimer > 0
+          });
+        } else {
+          // Case B: CHP + Boiler + Heat Storage
+          let pel = cmd.pel;
+          if (state.outageTimer > 0) {
+            pel = 0; // Forced CHP trip
+          } else {
+            if (pel > 0 && pel < trueP.chpPelMin - 0.1) state.limitViolations++;
+            if (state.chpOn && pel > 0 && Math.abs(pel - state.chpPel) > trueP.chpRamp + 0.2) state.limitViolations++;
+            if (!state.chpOn && pel > 0) state.chpStarts++;
+          }
+          state.chpOn = pel > 0;
+          state.chpPel = pel;
+
+          const qChp = pel * trueP.chpRatio;
+          const qBoilActual = clamp(cmd.qBoil, 0, trueP.boilMax);
+
+          const hsPrev = state.hsSoC;
+          const netQ = qChp + qBoilActual - ex.heatDemand;
+          let qHsActual = 0;
+          let unmet = 0;
+          if (netQ >= 0) {
+            const maxChg = ((SOC_MAX - hsPrev * (1 - trueP.hsLoss)) * trueP.hsCap) / DT;
+            qHsActual = Math.min(netQ, trueP.hsPmax, Math.max(0, maxChg));
+          } else {
+            const maxDis = ((hsPrev * (1 - trueP.hsLoss) - SOC_MIN) * trueP.hsCap) / DT;
+            const dis = Math.min(-netQ, trueP.hsPmax, Math.max(0, maxDis));
+            qHsActual = -dis;
+            unmet = Math.max(0, -netQ - dis);
+          }
+
+          state.hsSoC = clamp(hsPrev * (1 - trueP.hsLoss) + (qHsActual * DT) / trueP.hsCap, SOC_MIN, SOC_MAX);
+          state.unmetHeatMwh += unmet * DT;
+          if (unmet > 0.5) state.limitViolations++;
+
+          const stepMargin = (pel * (ex.price - trueP.chpFuelCost) - qBoilActual * trueP.boilCost) * DT - (state.chpOn ? 0 : 0);
+          state.netMargin += stepMargin;
+
+          // S4 rule checks
+          if (rule && rule.type === 'chp_cap' && t >= rule.startStep && t < rule.endStep && pel > rule.limitValue + 0.5) {
+            state.ruleViolations++;
+          }
+          if (rule && rule.type === 'storage_cap' && t >= rule.startStep && t < rule.endStep && state.hsSoC > rule.limitValue + 0.015) {
+            state.ruleViolations++;
+          }
+
+          updateRLS({
+            qHsActual,
+            dHsSoC: state.hsSoC - hsPrev,
+            hsSoCPrev: hsPrev,
+            qBoilCmd: cmd.qBoil,
+            qBoilActual
+          });
+
+          state.history.push({
+            t,
+            price: ex.price,
+            heatDemand: ex.heatDemand,
+            pel,
+            qChp,
+            qBoil: qBoilActual,
+            qHs: qHsActual,
+            unmet,
+            hsSoC: state.hsSoC,
+            outage: state.outageTimer > 0
+          });
+        }
+
+        if (state.outageTimer > 0) state.outageTimer--;
+        state.step++;
+
+        // End of day summary & auto-loop pause
+        if (state.step === STEPS) {
+          if (state.caseId === 'A') {
+            state.energyCost += (state.peakImportKw / 1000) * 120; // Add daily demand charge
+          } else {
+            state.netMargin -= state.chpStarts * 3500;
+          }
+          const key = `${state.caseId}:${state.scenario}:${state.arch}`;
+          const totViol = state.limitViolations + state.ruleViolations + state.deadlineMisses;
+          state.lastDayKPIs[key] = state.caseId === 'A'
+            ? `€${Math.round(state.energyCost)} · ${totViol} viol`
+            : `€${(state.netMargin / 1000).toFixed(1)}k · ${totViol} viol`;
+          state.endPauseTicks = 6;
+          updateAllUI();
+        } else {
+          updateDynamicTelemetry();
+        }
+      }
+
+      /* -----------------------------------------------------------------------
+         11. HIGH-DPI 4-PANEL STACKED CANVAS RENDERING
+         ----------------------------------------------------------------------- */
+      function resizeCanvas() {
+        const rect = canvasWrapper.getBoundingClientRect();
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        canvas.width = Math.max(1, Math.round(rect.width * dpr));
+        canvas.height = Math.max(1, Math.round(rect.height * dpr));
+      }
+
+      function tToX(t) { return PLOT_L + (t / STEPS) * PLOT_W; }
+      function xToT(x) { return clamp(Math.round(((x - PLOT_L) / PLOT_W) * STEPS), 4, STEPS - 4); }
+
+      function drawPanelBox(y0, h, title) {
+        ctx.fillStyle = '#ffffff';
+        ctx.strokeStyle = '#cbd5e1';
+        ctx.lineWidth = 1;
+        ctx.fillRect(PLOT_L, y0, PLOT_W, h);
+        ctx.strokeRect(PLOT_L, y0, PLOT_W, h);
+
+        // Vertical 3-hour gridlines
+        ctx.strokeStyle = '#f1f5f9';
+        for (let t = 12; t < STEPS; t += 12) {
+          const x = tToX(t);
+          ctx.beginPath(); ctx.moveTo(x, y0); ctx.lineTo(x, y0 + h); ctx.stroke();
+        }
+
+        ctx.fillStyle = '#0f172a';
+        ctx.font = '700 10px Inter, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText(title, PLOT_L + 6, y0 + 13);
+      }
+
+      function drawRuleOverlay(y0, h, startStep, endStep, known) {
+        const x1 = tToX(startStep);
+        const x2 = tToX(endStep);
+        if (x2 <= x1) return;
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(x1, y0, x2 - x1, h);
+        ctx.clip();
+
+        if (known) {
+          ctx.fillStyle = 'rgba(79, 70, 229, 0.10)';
+          ctx.fillRect(x1, y0, x2 - x1, h);
+          ctx.strokeStyle = 'rgba(79, 70, 229, 0.35)';
+          ctx.lineWidth = 1.2;
+          for (let x = x1 - h; x < x2 + h; x += 9) {
+            ctx.beginPath(); ctx.moveTo(x, y0 + h); ctx.lineTo(x + h, y0); ctx.stroke();
+          }
+          ctx.restore();
+          ctx.strokeStyle = '#4f46e5';
+          ctx.lineWidth = 1.5;
+          ctx.strokeRect(x1, y0, x2 - x1, h);
+        } else {
+          ctx.fillStyle = 'rgba(225, 29, 72, 0.08)';
+          ctx.fillRect(x1, y0, x2 - x1, h);
+          ctx.restore();
+          ctx.save();
+          ctx.strokeStyle = '#dc2626';
+          ctx.lineWidth = 1.8;
+          ctx.setLineDash([4, 3]);
+          ctx.strokeRect(x1, y0, x2 - x1, h);
+          ctx.restore();
+        }
+      }
+
+      function renderCanvas() {
+        const sx = canvas.width / CANVAS_W;
+        const sy = canvas.height / CANVAS_H;
+        ctx.save();
+        ctx.scale(sx, sy);
+
+        ctx.fillStyle = '#f8fafc';
+        ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+
+        const isA = state.caseId === 'A';
+        const nowX = tToX(state.step);
+
+        // ---------------- PANEL 1: PRICE & PV / HEAT DEMAND ----------------
+        const p1Y = 8, p1H = 102;
+        drawPanelBox(p1Y, p1H, isA ? '1. Electricity Price (€/MWh) & PV Forecast (MW)' : '1. Electricity Price (€/MWh) & District Heat Demand (MW_th)');
+
+        const maxPrice = isA ? 380 : 280;
+        const maxLeft = isA ? 1.2 : 120;
+
+        // Forecast uncertainty band ahead of "now"
+        if (state.step < STEPS - 1) {
+          ctx.fillStyle = 'rgba(148, 163, 184, 0.16)';
+          ctx.beginPath();
+          for (let t = state.step; t <= STEPS; t++) {
+            const ex = getExogenous(state.caseId, t, true);
+            const val = isA ? ex.pv : ex.heatDemand;
+            const spread = ((t - state.step) / STEPS) * (isA ? 0.22 : 14);
+            const y = p1Y + p1H - 8 - ((val + spread) / maxLeft) * (p1H - 24);
+            if (t === state.step) ctx.moveTo(tToX(t), clamp(y, p1Y + 14, p1Y + p1H - 6));
+            else ctx.lineTo(tToX(t), clamp(y, p1Y + 14, p1Y + p1H - 6));
+          }
+          for (let t = STEPS; t >= state.step; t--) {
+            const ex = getExogenous(state.caseId, t, true);
+            const val = isA ? ex.pv : ex.heatDemand;
+            const spread = ((t - state.step) / STEPS) * (isA ? 0.22 : 14);
+            const y = p1Y + p1H - 8 - (Math.max(0, val - spread) / maxLeft) * (p1H - 24);
+            ctx.lineTo(tToX(t), clamp(y, p1Y + 14, p1Y + p1H - 6));
+          }
+          ctx.closePath();
+          ctx.fill();
+        }
+
+        // Price line (amber/orange)
+        ctx.strokeStyle = '#d97706';
+        ctx.lineWidth = 1.8;
+        ctx.beginPath();
+        for (let t = 0; t <= STEPS; t++) {
+          const ex = getExogenous(state.caseId, t, t > state.step);
+          const y = p1Y + p1H - 8 - (ex.price / maxPrice) * (p1H - 24);
+          if (t === 0) ctx.moveTo(tToX(t), y); else ctx.lineTo(tToX(t), y);
+        }
+        ctx.stroke();
+
+        // PV (emerald, Case A) or Heat Demand (rose/crimson, Case B)
+        ctx.strokeStyle = isA ? '#059669' : '#e11d48';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        for (let t = 0; t <= STEPS; t++) {
+          const ex = getExogenous(state.caseId, t, t > state.step);
+          const val = isA ? ex.pv : ex.heatDemand;
+          const y = p1Y + p1H - 8 - (val / maxLeft) * (p1H - 24);
+          if (t === 0) ctx.moveTo(tToX(t), y); else ctx.lineTo(tToX(t), y);
+        }
+        ctx.stroke();
+
+        // Axis labels
+        ctx.fillStyle = isA ? '#059669' : '#e11d48';
+        ctx.font = '600 9px Inter, sans-serif';
+        ctx.textAlign = 'right';
+        ctx.fillText(isA ? '1.2 MW' : '120 MW_th', PLOT_L - 5, p1Y + 22);
+        ctx.fillText('0', PLOT_L - 5, p1Y + p1H - 6);
+        ctx.fillStyle = '#b45309';
+        ctx.textAlign = 'left';
+        ctx.fillText(`${maxPrice} €/MWh`, PLOT_R + 4, p1Y + 22);
+        ctx.fillText('0 €', PLOT_R + 4, p1Y + p1H - 6);
+
+        // S1 Draggable disturbance handle
+        if (state.scenario === 'S1') {
+          const dx = tToX(state.disturbStep[state.caseId]);
+          const dy = p1Y + 36;
+          ctx.fillStyle = '#e11d48';
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 1.8;
+          ctx.beginPath(); ctx.arc(dx, dy, 6.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+          ctx.fillStyle = '#9f1239';
+          ctx.font = '700 9px Inter, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText(isA ? 'PV Dip / Spike ⇄' : 'Heat Surge ⇄', clamp(dx, PLOT_L + 45, PLOT_R - 45), dy - 9);
+        }
+
+        // ---------------- PANEL 2: GANTT / UNIT COMMITMENT ----------------
+        const p2Y = 118, p2H = 92;
+        drawPanelBox(p2Y, p2H, isA ? '2. Flexible Production Jobs (Solid = Executed, Dashed = Planned)' : '2. Unit Commitment (CHP & Gas Boiler, MW)');
+
+        if (isA) {
+          const rowH = 15.5;
+          state.jobs.forEach((j, idx) => {
+            const ry = p2Y + 21 + idx * (rowH + 2);
+            // Valid window outline
+            ctx.strokeStyle = '#e2e8f0';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(tToX(j.winStart), ry, tToX(j.winEnd) - tToX(j.winStart), rowH - 2);
+
+            ctx.fillStyle = '#475569';
+            ctx.font = '600 9px Inter, sans-serif';
+            ctx.textAlign = 'right';
+            ctx.fillText(j.name.split(' ')[0], PLOT_L - 5, ry + 10);
+
+            // Executed blocks
+            ctx.fillStyle = '#10b981';
+            for (const h of state.history) {
+              if (h.activeJobs.includes(j.id)) {
+                ctx.fillRect(tToX(h.t), ry + 1, Math.max(2, PLOT_W / STEPS - 0.8), rowH - 4);
+              } else if (j.id === 'furnace' && h.outage) {
+                ctx.fillStyle = '#f43f5e';
+                ctx.fillRect(tToX(h.t), ry + 1, Math.max(2, PLOT_W / STEPS - 0.8), rowH - 4);
+                ctx.fillStyle = '#10b981';
+              }
+            }
+            // Planned ghost blocks
+            const planSteps = state.plannedJobs[j.id] || [];
+            ctx.fillStyle = 'rgba(59, 130, 246, 0.22)';
+            ctx.strokeStyle = '#2563eb';
+            ctx.lineWidth = 0.8;
+            for (const pt of planSteps) {
+              if (pt >= state.step) {
+                const x = tToX(pt);
+                const w = Math.max(2, PLOT_W / STEPS - 0.8);
+                ctx.fillRect(x, ry + 1, w, rowH - 4);
+                ctx.strokeRect(x, ry + 1, w, rowH - 4);
+              }
+            }
+          });
+          if (state.scenario === 'S4' && state.ruleActive && state.parsedRule && state.parsedRule.type === 'furnace_lockout') {
+            drawRuleOverlay(p2Y + 20, rowH, state.parsedRule.startStep, state.parsedRule.endStep, controllerKnowsRule(state.arch));
+          }
+        } else {
+          // Case B: CHP & Boiler rows
+          const rows = [
+            { label: 'CHP', y: p2Y + 26, h: 24, max: 50, color: '#2563eb' },
+            { label: 'Boiler', y: p2Y + 58, h: 24, max: 40, color: '#d97706' }
+          ];
+          rows.forEach(r => {
+            ctx.fillStyle = '#475569';
+            ctx.font = '600 9px Inter, sans-serif';
+            ctx.textAlign = 'right';
+            ctx.fillText(r.label, PLOT_L - 5, r.y + 15);
+          });
+          for (const h of state.history) {
+            const x = tToX(h.t);
+            const w = Math.max(2, PLOT_W / STEPS - 0.6);
+            const chpH = (h.pel / 50) * 22;
+            ctx.fillStyle = h.outage ? '#f43f5e' : '#2563eb';
+            ctx.fillRect(x, rows[0].y + 22 - chpH, w, Math.max(h.outage ? 6 : 0, chpH));
+            const bH = (h.qBoil / 40) * 22;
+            ctx.fillStyle = '#d97706';
+            ctx.fillRect(x, rows[1].y + 22 - bH, w, bH);
+          }
+          for (const p of state.plannedChp) {
+            if (p.t >= state.step) {
+              const x = tToX(p.t);
+              const w = Math.max(2, PLOT_W / STEPS - 0.6);
+              const chpH = (p.pel / 50) * 22;
+              ctx.fillStyle = 'rgba(37, 99, 235, 0.2)';
+              ctx.fillRect(x, rows[0].y + 22 - chpH, w, chpH);
+            }
+          }
+          if (state.scenario === 'S4' && state.ruleActive && state.parsedRule && state.parsedRule.type === 'chp_cap') {
+            drawRuleOverlay(rows[0].y, 24, state.parsedRule.startStep, state.parsedRule.endStep, controllerKnowsRule(state.arch));
+          }
+        }
+
+        // ---------------- PANEL 3: POWER / HEAT BALANCE & VIOLATIONS ----------------
+        const p3Y = 218, p3H = 108;
+        drawPanelBox(p3Y, p3H, isA ? '3. Grid Import vs. 1.50 MW Limit (Red = Violation)' : '3. Heat Supply vs. Demand (Red = Unmet Heat)');
+
+        const maxP3 = isA ? 2.4 : 115;
+        for (const h of state.history) {
+          const x = tToX(h.t);
+          const w = Math.max(2, PLOT_W / STEPS - 0.5);
+          if (isA) {
+            const barH = Math.min(p3H - 22, (h.gridImport / maxP3) * (p3H - 22));
+            const activeLim = (state.scenario === 'S4' && state.ruleActive && state.parsedRule && state.parsedRule.type === 'grid_cap' && h.t >= state.parsedRule.startStep && h.t < state.parsedRule.endStep)
+              ? state.parsedRule.limitValue : 1.50;
+            const viol = h.gridImport > activeLim + 0.015;
+            ctx.fillStyle = viol ? 'rgba(225, 29, 72, 0.78)' : 'rgba(59, 130, 246, 0.55)';
+            ctx.fillRect(x, p3Y + p3H - 6 - barH, w, barH);
+          } else {
+            const supH = Math.min(p3H - 22, ((h.qChp + h.qBoil + Math.max(0, -h.qHs)) / maxP3) * (p3H - 22));
+            ctx.fillStyle = 'rgba(16, 185, 129, 0.55)';
+            ctx.fillRect(x, p3Y + p3H - 6 - supH, w, supH);
+            if (h.unmet > 0.5) {
+              const demH = Math.min(p3H - 22, (h.heatDemand / maxP3) * (p3H - 22));
+              ctx.fillStyle = 'rgba(225, 29, 72, 0.85)';
+              ctx.fillRect(x, p3Y + p3H - 6 - demH, w, Math.max(3, demH - supH));
+            }
+          }
+        }
+
+        if (isA) {
+          const limY = p3Y + p3H - 6 - (1.50 / maxP3) * (p3H - 22);
+          ctx.strokeStyle = '#dc2626';
+          ctx.lineWidth = 1.4;
+          ctx.setLineDash([5, 3]);
+          ctx.beginPath(); ctx.moveTo(PLOT_L, limY); ctx.lineTo(PLOT_R, limY); ctx.stroke();
+          ctx.setLineDash([]);
+          if (state.scenario === 'S4' && state.ruleActive && state.parsedRule && state.parsedRule.type === 'grid_cap') {
+            drawRuleOverlay(p3Y + 16, p3H - 22, state.parsedRule.startStep, state.parsedRule.endStep, controllerKnowsRule(state.arch));
+          }
+        } else {
+          // Heat demand overlay line
+          ctx.strokeStyle = '#0f172a';
+          ctx.lineWidth = 1.6;
+          ctx.beginPath();
+          for (let t = 0; t <= STEPS; t++) {
+            const ex = getExogenous('B', t, t > state.step);
+            const y = p3Y + p3H - 6 - (ex.heatDemand / maxP3) * (p3H - 22);
+            if (t === 0) ctx.moveTo(tToX(t), y); else ctx.lineTo(tToX(t), y);
+          }
+          ctx.stroke();
+        }
+        ctx.fillStyle = '#475569';
+        ctx.font = '600 9px Inter, sans-serif';
+        ctx.textAlign = 'right';
+        ctx.fillText(isA ? '2.4 MW' : '115 MW_th', PLOT_L - 5, p3Y + 22);
+        ctx.fillText('0', PLOT_L - 5, p3Y + p3H - 6);
+
+        // ---------------- PANEL 4: STORAGE LEVELS + V(t, SoC) HEATMAP + ROLLOUTS ----------------
+        const p4Y = 334, p4H = 112;
+        drawPanelBox(p4Y, p4H, isA ? '4. Storage SoC (%) — Battery (Blue) & Thermal (Teal)' : '4. Heat Storage SoC (%)');
+
+        const isRL = state.arch === 'wm_rl_mpc' || state.arch === 'full_triad';
+        if (state.showHeatmap && isRL) {
+          const normGrid = state.arch === 'full_triad' ? state.valueNormSafe : state.valueNormStale;
+          const cellW = PLOT_W / STEPS;
+          const cellH = (p4H - 22) / (SOC_BINS - 1);
+          for (let t = 0; t < STEPS; t++) {
+            for (let b = 0; b < SOC_BINS - 1; b++) {
+              const v = normGrid[t][b];
+              const hue = 36 + v * 114;
+              ctx.fillStyle = `hsla(${hue}, 82%, 52%, ${0.08 + v * 0.28})`;
+              const ry = p4Y + p4H - 6 - ((b + 1) / (SOC_BINS - 1)) * (p4H - 22);
+              ctx.fillRect(tToX(t), ry, cellW + 0.6, cellH + 0.6);
+            }
+          }
+          ctx.fillStyle = (state.scenario === 'S4' && state.arch === 'wm_rl_mpc') ? '#be123c' : '#92400e';
+          ctx.font = '700 9px Inter, sans-serif';
+          ctx.textAlign = 'right';
+          const hmLbl = (state.scenario === 'S4' && state.arch === 'wm_rl_mpc')
+            ? 'V(t, SoC): Stale Policy'
+            : (state.scenario === 'S4' ? 'V(t, SoC): LLM-Masked Safe' : 'RL Critic V(t, SoC)');
+          ctx.fillText(hmLbl, PLOT_R - 6, p4Y + 13);
+        }
+
+        if (state.scenario === 'S4' && state.ruleActive && state.parsedRule && state.parsedRule.type === 'storage_cap') {
+          drawRuleOverlay(p4Y + 16, p4H - 22, state.parsedRule.startStep, state.parsedRule.endStep, controllerKnowsRule(state.arch));
+        }
+
+        // Executed SoC curves
+        if (state.history.length > 0) {
+          if (isA) {
+            ctx.strokeStyle = '#0d9488';
+            ctx.lineWidth = 1.6;
+            ctx.beginPath();
+            state.history.forEach((h, i) => {
+              const y = p4Y + p4H - 6 - h.thSoC * (p4H - 22);
+              if (i === 0) ctx.moveTo(tToX(h.t), y); else ctx.lineTo(tToX(h.t), y);
+            });
+            ctx.stroke();
+          }
+          ctx.strokeStyle = '#1d4ed8';
+          ctx.lineWidth = 2.2;
+          ctx.beginPath();
+          state.history.forEach((h, i) => {
+            const soc = isA ? h.batSoC : h.hsSoC;
+            const y = p4Y + p4H - 6 - soc * (p4H - 22);
+            if (i === 0) ctx.moveTo(tToX(h.t), y); else ctx.lineTo(tToX(h.t), y);
+          });
+          ctx.stroke();
+        }
+
+        // MPC Rollout fan ahead of "now"
+        if (state.showRollouts && state.mpcRollouts.length > 0) {
+          ctx.lineWidth = 1;
+          for (let i = 0; i < state.mpcRollouts.length; i += Math.max(1, Math.floor(state.mpcRollouts.length / 22))) {
+            const r = state.mpcRollouts[i];
+            ctx.strokeStyle = 'rgba(100, 116, 139, 0.35)';
+            ctx.beginPath();
+            r.pts.forEach((p, idx) => {
+              const y = p4Y + p4H - 6 - p.soc * (p4H - 22);
+              if (idx === 0) ctx.moveTo(tToX(p.t), y); else ctx.lineTo(tToX(p.t), y);
+            });
+            ctx.stroke();
+          }
+          if (state.bestRollout) {
+            ctx.strokeStyle = '#2563eb';
+            ctx.lineWidth = 2.4;
+            ctx.beginPath();
+            state.bestRollout.forEach((p, idx) => {
+              const y = p4Y + p4H - 6 - p.soc * (p4H - 22);
+              if (idx === 0) ctx.moveTo(tToX(p.t), y); else ctx.lineTo(tToX(p.t), y);
+            });
+            ctx.stroke();
+          }
+        }
+
+        ctx.fillStyle = '#475569';
+        ctx.font = '600 9px Inter, sans-serif';
+        ctx.textAlign = 'right';
+        ctx.fillText('100%', PLOT_L - 5, p4Y + 22);
+        ctx.fillText('0%', PLOT_L - 5, p4Y + p4H - 6);
+
+        // ---------------- SHARED TIME AXIS & "NOW" CURSOR ----------------
+        ctx.fillStyle = '#475569';
+        ctx.font = '600 9.5px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        for (let t = 0; t <= STEPS; t += 12) {
+          ctx.fillText(stepToHHMM(t), tToX(t), CANVAS_H - 5);
+        }
+
+        ctx.strokeStyle = '#0f172a';
+        ctx.lineWidth = 1.6;
+        ctx.beginPath(); ctx.moveTo(nowX, p1Y); ctx.lineTo(nowX, p4Y + p4H); ctx.stroke();
+
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(clamp(nowX - 18, PLOT_L, PLOT_R - 36), 1, 36, 13);
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '700 8.5px Inter, sans-serif';
+        ctx.fillText(stepToHHMM(state.step), clamp(nowX, PLOT_L + 18, PLOT_R - 18), 10.5);
+
+        ctx.restore();
+      }
+
+      /* -----------------------------------------------------------------------
+         12. 48 EXPLANATIONS (6 ARCHS x 4 SCENARIOS x 2 CASES) & UI BUILDERS
+         ----------------------------------------------------------------------- */
+      const EXPLANATIONS = {
+        classical_mpc: {
+          A: {
+            S1: 'The nominal physics twin + DP optimiser re-plans smoothly every 15 min after PV dips, price spikes, or a 1-h furnace breakdown, keeping grid imports within the 1.50 MW limit.',
+            S2: 'With 25% battery fade and higher thermal losses, the nominal twin overestimates usable energy—causing unexpected limit violations until the engineer re-parametrises the twin.',
+            S3: 'At the 4 h horizon, the DP solver cannot see the distant 17:00 peak and skips cheap midday charging. Raising the horizon to 8–12 h solves it, but solver nodes and latency grow steeply.',
+            S4: 'Classical MPC has no natural-language channel, so it continues violating the 1.0 MW cap or maintenance rule until the engineer manually encodes the constraint.'
+          },
+          B: {
+            S1: 'The DP solver adapts CHP setpoints and heat storage discharge cleanly after a heat surge or 1-h CHP trip, balancing electrical margin and district heat demand.',
+            S2: 'Under boiler fouling and higher storage losses, the nominal twin assumes 40 MW_th backup capacity and low leakage—resulting in unmet heat MWh until re-parametrised.',
+            S3: 'With a 4 h horizon, pre-charging at low night prices looks unprofitable locally. Increasing the horizon to ≥ 8 h discovers night pre-charging, at a steep solver-node compute cost.',
+            S4: 'The nominal MILP-type solver ignores text-based redispatch or inspection caps until the engineer manually encodes the new constraint into the model.'
+          }
+        },
+        llm_only: {
+          A: {
+            S1: 'The emulated LLM applies coarse qualitative rules ("charge when cheap, run loads at midday") without checking 1.50 MW grid capacity or SoC dynamics, causing limit violations.',
+            S2: 'Because the LLM has no physical dynamics model or energy-balance equations, plant parameter mismatch goes unnoticed while power and deadline violations accumulate.',
+            S3: 'The LLM grasps the idea of charging before the evening peak, but without quantitative optimisation its arbitrary power commands cause grid-limit violations.',
+            S4: 'The LLM parses the natural-language rule immediately and reduces evening imports, yet still breaks energy and power balance elsewhere due to missing physics constraints.'
+          },
+          B: {
+            S1: 'Without a thermal balance or ramp model, the heuristic LLM jumps CHP setpoints abruptly—violating the 10%/15-min ramp limit and leaving heat demand unmet during surges.',
+            S2: 'Having no plant twin or online estimator, the LLM cannot compensate for boiler fouling or storage losses, producing both ramp violations and unmet heat.',
+            S3: 'The LLM guesses rough charging heuristics ahead of peaks, but fails to coordinate CHP ramp rates, storage bounds, and gas-boiler dispatch.',
+            S4: 'The LLM obeys the zero-shot redispatch or storage-cap text immediately, but without continuous physics enforcement it still triggers ramp and heat-balance violations.'
+          }
+        },
+        wm_mpc: {
+          A: {
+            S1: 'Online RLS tracks the clean plant dynamics while 64 smooth CEM rollouts anticipate the PV dip and breakdown, maintaining zero limit violations.',
+            S2: 'Online RLS detects the residual between predicted and observed SoC within a few steps, adapting its latent capacity/efficiency estimate to eliminate mismatch violations.',
+            S3: 'Despite an accurate learned world model, CEM only looks 4 h ahead—never discovering the payoff of charging during midday PV for the 17:00–20:30 price peak.',
+            S4: 'Without an LLM rule interface, the learned world model + MPC optimises purely on physical cost and repeatedly violates the newly announced grid cap or maintenance window.'
+          },
+          B: {
+            S1: '64 CEM rollouts over the RLS-adapted world model anticipate heat-demand surges and recover smoothly from a 1-h CHP trip without ramp or unmet-heat violations.',
+            S2: 'Online RLS identifies the fouled boiler cap and elevated storage losses from live plant residuals, shifting dispatch earlier to avoid unmet heat.',
+            S3: 'Myopic beyond its 4 h horizon, WM + MPC sees night charging as an immediate loss and enters the 90 MW_th morning peak with an empty heat store.',
+            S4: 'Having no natural-language channel, WM + MPC ignores the mid-day redispatch or 70% storage inspection cap and violates the rule.'
+          }
+        },
+        llm_wm_mpc: {
+          A: {
+            S1: 'The LLM supervises task intent while the RLS world model + 64-rollout CEM executes smooth, constraint-compliant control across disturbances.',
+            S2: 'Online RLS adapts to battery fade and thermal losses automatically, so the hybrid controller achieves zero violations without waiting for an engineer.',
+            S3: 'The LLM injects a semantic subgoal ("charge battery ≥ 80% before 16:00"), bridging the 4 h myopia so CEM pre-charges during cheap midday PV.',
+            S4: 'Zero-shot rule parsing in action: the LLM translates the natural-language instruction directly into an MPC constraint, achieving zero rule and physics violations.'
+          },
+          B: {
+            S1: 'The LLM coordinates high-level dispatch intent while RLS + CEM respects CHP ramp and min-load limits through heat surges and trips.',
+            S2: 'Online RLS tracks boiler fouling and storage leakage automatically, keeping district heat fully served without manual re-parametrisation.',
+            S3: 'The LLM sets a semantic pre-charge subgoal ahead of the morning peak, overcoming the 4 h horizon limit without needing an 8–12 h solver.',
+            S4: 'The LLM parses the redispatch or storage-inspection text zero-shot and injects hard bounds into MPC, achieving zero violations.'
+          }
+        },
+        wm_rl_mpc: {
+          A: {
+            S1: 'TD-MPC2 style: the RL Value Critic V(t, SoC) warm-starts a compact 16-rollout CEM search over the RLS world model for fast, compliant disturbance response.',
+            S2: 'Online RLS adapts to the degraded battery while V(t, SoC) and hybrid CEM rollouts keep control smooth and violation-free at low compute.',
+            S3: 'No LLM needed: Bellman value iteration propagated the evening-peak payoff backward into V(t, SoC), guiding 4 h MPC to pre-charge with only 16 rollouts/step.',
+            S4: 'Crucial RL limitation: V(t, SoC) was trained on the old rules. Without an LLM to mask the new grid cap or maintenance window, the stale policy violates the rule.'
+          },
+          B: {
+            S1: 'The RL Critic V(t, SoC) warm-starts 16 CEM rollouts over the RLS world model, handling heat surges and CHP trips at minimal compute.',
+            S2: 'Online RLS tracks boiler fouling and storage loss while V(t, SoC) preserves long-horizon storage coordination with zero unmet heat.',
+            S3: 'Toggle V(t, SoC) to see how long-horizon Bellman backup makes night pre-charging attractive even at a 4 h MPC horizon, using 4× fewer rollouts than unprimed CEM.',
+            S4: 'Because V(t, SoC) reflects pre-shift rewards and has no language channel, it continues pushing CHP or storage past the newly announced redispatch/inspection limit.'
+          }
+        },
+        full_triad: {
+          A: {
+            S1: 'All components align: RLS tracks true physics, V(t, SoC) warm-starts 18 fast CEM rollouts, and the LLM supervises rules and constraints.',
+            S2: 'Online RLS eliminates plant-model mismatch automatically while RL + MPC maintains low-compute, zero-violation dispatch.',
+            S3: 'Both V(t, SoC) and LLM oversight guide smooth midday pre-charging at a 4 h horizon using only 18 warm-started rollouts/step.',
+            S4: 'Best of all worlds: the LLM parses the new rule zero-shot and masks stale RL values inside the constrained window, delivering fast, zero-violation control.'
+          },
+          B: {
+            S1: 'Full Triad combines RLS adaptation, V(t, SoC) warm-starting (18 rollouts), and LLM rule supervision for resilient CHP dispatch.',
+            S2: 'Online RLS detects boiler fouling and storage losses immediately, keeping unmet heat at 0 MWh without manual twin updates.',
+            S3: 'Long-horizon V(t, SoC) solves the morning-peak storage dilemma at a 4 h horizon with low compute and strong net margin.',
+            S4: 'The LLM masks the stale RL value field V(t, SoC) zero-shot to enforce the redispatch or 70% storage cap while preserving fast warm-started MPC.'
+          }
+        }
+      };
+
+      function buildArchSelector() {
+        archSelector.innerHTML = ARCHS.map(a => {
+          const active = a.id === state.arch;
+          const dots = a.badges.map(b => `<span class="inline-block w-2 h-2 rounded-full ${b.cls}" title="${b.label}"></span>`).join('');
+          const lastKey = `${state.caseId}:${state.scenario}:${a.id}`;
+          const badge = state.lastDayKPIs[lastKey]
+            ? `<span class="mt-1 inline-block text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-white/80 border border-slate-200 text-slate-700">${state.lastDayKPIs[lastKey]}</span>`
+            : '';
+          return `
+            <button data-arch="${a.id}" role="tab" aria-selected="${active}"
+              class="arch-btn text-left p-2 rounded-xl border transition cursor-pointer flex flex-col justify-between ${
+                active ? a.activeCardCls : 'border-slate-200 bg-slate-50/70 hover:bg-white hover:border-slate-300'
+              }">
+              <div class="flex items-center justify-between gap-1">
+                <span class="text-xs font-bold text-slate-900 leading-tight">${a.shortTitle}</span>
+                <span class="flex items-center gap-0.5 shrink-0">${dots}</span>
+              </div>
+              <span class="text-[11px] text-slate-500 leading-tight mt-0.5">${a.subtitle}</span>
+              ${badge}
+            </button>
+          `;
+        }).join('');
+
+        archSelector.querySelectorAll('.arch-btn').forEach(btn => {
+          btn.addEventListener('click', () => {
+            state.arch = btn.dataset.arch;
+            if (state.arch === 'wm_rl_mpc' || state.arch === 'full_triad') {
+              state.showHeatmap = true;
+              toggleHeatmap.checked = true;
+            }
+            setupDay(true);
+          });
+        });
+      }
+
+      function buildComparisonMatrix() {
+        matrixBody.innerHTML = ARCHS.map(a => {
+          const active = a.id === state.arch;
+          const dots = a.badges.map(b => `<span class="inline-block w-2 h-2 rounded-full ${b.cls}"></span>`).join('');
+          return `
+            <tr class="${active ? a.rowHighlightCls + ' font-medium' : 'hover:bg-slate-50/70'} transition">
+              <td class="py-2 px-3 whitespace-nowrap">
+                <div class="flex items-center gap-1.5 font-bold text-slate-900">
+                  <span class="flex items-center gap-0.5">${dots}</span>
+                  <span>${a.shortTitle}</span>
+                </div>
+              </td>
+              <td class="py-2 px-3 text-slate-700">${a.matrix.basis}</td>
+              <td class="py-2 px-3 text-slate-700">${a.matrix.storageVal}</td>
+              <td class="py-2 px-3 text-slate-700">${a.matrix.mismatch}</td>
+              <td class="py-2 px-3 text-slate-700">${a.matrix.compute}</td>
+              <td class="py-2 px-3 text-slate-700">${a.matrix.zeroShot}</td>
+              <td class="py-2 px-3 font-mono text-[11px] text-slate-700 whitespace-nowrap">${a.matrix.ref}</td>
+            </tr>
+          `;
+        }).join('');
+      }
+
+      function renderPipeline() {
+        const a = state.arch;
+        const trueP = getTrueParams(state.caseId);
+        const nomP = getNominalParams(state.caseId);
+        const styles = {
+          slate:   { border: 'border-l-slate-700 border-slate-300 bg-slate-50/70', dot: 'bg-slate-700', text: 'text-slate-900', pill: 'bg-slate-200 text-slate-800' },
+          indigo:  { border: 'border-l-indigo-600 border-indigo-200 bg-indigo-50/40', dot: 'bg-indigo-600', text: 'text-indigo-800', pill: 'bg-indigo-100 text-indigo-700' },
+          emerald: { border: 'border-l-emerald-600 border-emerald-200 bg-emerald-50/40', dot: 'bg-emerald-600', text: 'text-emerald-900', pill: 'bg-emerald-100 text-emerald-700' },
+          amber:   { border: 'border-l-amber-500 border-amber-200 bg-amber-50/40', dot: 'bg-amber-500', text: 'text-amber-900', pill: 'bg-amber-100 text-amber-800' },
+          blue:    { border: 'border-l-blue-600 border-blue-200 bg-blue-50/40', dot: 'bg-blue-600', text: 'text-blue-900', pill: 'bg-blue-100 text-blue-700' }
+        };
+
+        let blocks;
+        if (a === 'classical_mpc') {
+          const twinNote = state.scenario === 'S2'
+            ? (state.twinReparamDone
+              ? 'Re-parametrised: twin matches true plant parameters.'
+              : `Nominal twin (${state.mismatchPct}% mismatch vs true plant).`)
+            : 'First-principles nominal equations active.';
+          const milpNote = state.scenario === 'S4' && state.ruleActive
+            ? (state.baselineRuleEncoded ? 'Constraint manually encoded into DP.' : 'Rule unknown until engineer encodes it.')
+            : `DP over (${state.horizonHours} h × ${SOC_BINS} SoC bins): ${state.computeMetric} nodes.`;
+          blocks = [
+            { title: '1. Nominal Physics Twin', color: 'slate', active: true, tag: 'White-Box', readout: twinNote },
+            { title: '2. MILP-Type Optimiser (DP Solver)', color: 'blue', active: true, tag: `H = ${state.horizonHours} h`, readout: milpNote },
+            { title: '3. Physical Plant', color: 'emerald', active: true, tag: state.caseId === 'A' ? 'PPC + Storage' : 'CHP + Heat', readout: `Executing 15-min setpoints at ${stepToHHMM(state.step)}.` }
+          ];
+        } else {
+          const hasLLM = a === 'llm_only' || a === 'llm_wm_mpc' || a === 'full_triad';
+          const hasWM = a !== 'llm_only';
+          const hasRL = a === 'wm_rl_mpc' || a === 'full_triad';
+          const hasMPC = a !== 'llm_only';
+
+          const wmReadout = !hasWM
+            ? 'Inactive — No dynamics model or energy balance.'
+            : (state.caseId === 'A'
+              ? `RLS E_bat: Nom ${nomP.batCap.toFixed(2)} | True ${trueP.batCap.toFixed(2)} | Est ${state.rls.batCapEst.toFixed(2)} MWh`
+              : `RLS Q_boil: Nom ${nomP.boilMax.toFixed(0)} | True ${trueP.boilMax.toFixed(1)} | Est ${state.rls.boilCapEst.toFixed(1)} MW_th`);
+          const rlReadout = !hasRL
+            ? 'Inactive — No learned value critic V(t, SoC).'
+            : (state.scenario === 'S4' && state.ruleActive
+              ? (a === 'full_triad' ? 'LLM-masked safe V(t, SoC) active.' : 'WARNING: Stale V(t, SoC) ignores new rule!')
+              : 'Bellman V(t, SoC) guides long-horizon storage terminal cost.');
+          const mpcReadout = !hasMPC
+            ? 'Inactive — Greedy heuristic tokens only.'
+            : `Block-CEM (${state.computeMetric} rollouts/step, ${state.latencyMs} ms, H=${state.horizonHours}h).`;
+
+          blocks = [
+            { title: '1. LLM Strategic & Rule Layer', color: 'indigo', active: hasLLM, tag: 'Symbolic / NL', readout: hasLLM ? state.llmLog : 'Inactive — No natural-language rule channel.' },
+            { title: '2. Learned Latent WM (Online RLS)', color: 'emerald', active: hasWM, tag: 'JEPA-Type', readout: wmReadout },
+            { title: '3. RL Value Critic V(t, SoC)', color: 'amber', active: hasRL, tag: 'TD-MPC2', readout: rlReadout },
+            { title: '4. MPC Trajectory Optimiser', color: 'blue', active: hasMPC, tag: 'Block-CEM', readout: mpcReadout }
+          ];
+        }
+
+        pipelineContainer.innerHTML = blocks.map((b, idx) => {
+          const cs = styles[b.color];
+          const arrow = idx < blocks.length - 1 ? `<div class="flex justify-center -my-1 text-slate-300 text-[10px] font-bold select-none">&darr;</div>` : '';
+          if (!b.active) {
+            return `
+              <div class="rounded-xl border border-slate-200 bg-slate-50/70 px-2.5 py-1.5 opacity-50">
+                <div class="flex items-center justify-between gap-2">
+                  <span class="text-[11px] font-bold text-slate-500">${b.title}</span>
+                  <span class="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-slate-200 text-slate-500">INACTIVE</span>
+                </div>
+                <p class="text-[11px] text-slate-400 truncate">${b.readout}</p>
+              </div>${arrow}`;
+          }
+          return `
+            <div class="rounded-xl border border-l-4 ${cs.border} px-2.5 py-1.5">
+              <div class="flex items-center justify-between gap-2">
+                <div class="flex items-center gap-1.5">
+                  <span class="w-2 h-2 rounded-full ${cs.dot} live-dot shrink-0"></span>
+                  <span class="text-[11px] font-bold ${cs.text}">${b.title}</span>
+                </div>
+                <span class="text-[9px] font-bold px-1.5 py-0.5 rounded ${cs.pill}">${b.tag}</span>
+              </div>
+              <p class="text-[11px] text-slate-700 mt-0.5 leading-snug">${b.readout}</p>
+            </div>${arrow}`;
+        }).join('');
+      }
+
+      function updateDynamicTelemetry() {
+        const activeArch = ARCHS.find(a => a.id === state.arch);
+        pipelineModeBadge.textContent = activeArch.shortTitle;
+        dayLoopLabel.textContent = `Day ${state.dayCount} · ${stepToHHMM(state.step)}`;
+
+        if (state.caseId === 'A') {
+          kpi1Title.textContent = 'Energy Cost (€)';
+          kpi1Val.textContent = `${Math.round(state.energyCost).toLocaleString()} €`;
+          kpi1Sub.textContent = `Peak: ${state.peakImportKw} kW`;
+          kpi3Title.textContent = 'Limit / Rule Viol.';
+          kpi3Val.textContent = `${state.limitViolations} / ${state.ruleViolations}`;
+          kpi3Sub.textContent = `${state.deadlineMisses} misses`;
+        } else {
+          kpi1Title.textContent = 'Net Margin (€)';
+          kpi1Val.textContent = `${Math.round(state.netMargin).toLocaleString()} €`;
+          kpi1Sub.textContent = `${state.chpStarts} starts`;
+          kpi3Title.textContent = 'Ramp / Rule Viol.';
+          kpi3Val.textContent = `${state.limitViolations} / ${state.ruleViolations}`;
+          kpi3Sub.textContent = `${state.unmetHeatMwh.toFixed(1)} MWh unmet`;
+        }
+
+        kpi2Title.textContent = 'Compute / Step';
+        kpi2Val.textContent = `${state.computeMetric.toLocaleString()} ${state.computeUnit}`;
+        kpi2Sub.textContent = `${state.latencyMs} ms`;
+
+        const totViol = state.limitViolations + state.ruleViolations + state.deadlineMisses;
+        let stText = 'Optimal Dispatch';
+        let stCls = 'bg-emerald-100 text-emerald-800 border border-emerald-300';
+        if (state.step >= STEPS) {
+          stText = 'Day Complete (24:00)';
+          stCls = 'bg-blue-100 text-blue-800 border border-blue-300';
+        } else if (state.scenario === 'S4' && state.ruleActive && !controllerKnowsRule(state.arch) && state.ruleViolations > 0) {
+          stText = state.arch === 'wm_rl_mpc' ? 'Stale RL — Rule Violation!' : 'Rule Violation!';
+          stCls = 'bg-rose-100 text-rose-800 border border-rose-300';
+        } else if (totViol > 0) {
+          stText = state.scenario === 'S2' && state.arch === 'classical_mpc' ? 'Twin Mismatch — Violations!' : 'Constraint Violations!';
+          stCls = 'bg-rose-100 text-rose-800 border border-rose-300';
+        } else if (state.outageTimer > 0) {
+          stText = state.caseId === 'A' ? 'Furnace Breakdown — Re-planning' : 'CHP Trip — Re-planning';
+          stCls = 'bg-amber-100 text-amber-900 border border-amber-300';
+        } else if (state.scenario === 'S3' && state.horizonHours <= 4 && (state.arch === 'classical_mpc' || state.arch === 'wm_mpc')) {
+          stText = 'Myopic Horizon (4 h)';
+          stCls = 'bg-amber-50 text-amber-800 border border-amber-300';
+        }
+        kpiStatus.textContent = stText;
+        kpiStatus.className = `inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold ${stCls}`;
+
+        if (state.scenario === 'S2') {
+          reparamStatus.textContent = state.twinReparamDone
+            ? 'Twin Updated ✓'
+            : (state.twinReparamTimer > 0 ? `Updating (${state.twinReparamTimer} steps)...` : '');
+        }
+        if (state.scenario === 'S4') {
+          encodeStatus.textContent = state.baselineRuleEncoded
+            ? 'Constraint Encoded ✓'
+            : (state.encodeTimer > 0 ? `Encoding (${state.encodeTimer} steps)...` : '');
+        }
+
+        explainTag.textContent = `Case ${state.caseId} · ${state.scenario}`;
+        explainText.textContent = EXPLANATIONS[state.arch][state.caseId][state.scenario];
+        renderPipeline();
+      }
+
+      function updateAllUI() {
+        buildArchSelector();
+        buildComparisonMatrix();
+
+        btnCaseA.className = `case-btn px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
+          state.caseId === 'A' ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
+        }`;
+        btnCaseB.className = `case-btn px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
+          state.caseId === 'B' ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
+        }`;
+
+        scenarioBtns.forEach(btn => {
+          const active = btn.dataset.scenario === state.scenario;
+          btn.className = `scenario-btn px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition cursor-pointer ${
+            active ? 'bg-slate-900 text-white border-slate-900 shadow-sm' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+          }`;
+        });
+
+        ctrlS1.classList.toggle('hidden', state.scenario !== 'S1');
+        ctrlS1.classList.toggle('flex', state.scenario === 'S1');
+        ctrlS2.classList.toggle('hidden', state.scenario !== 'S2');
+        ctrlS2.classList.toggle('flex', state.scenario === 'S2');
+        ctrlS3.classList.toggle('hidden', state.scenario !== 'S3');
+        ctrlS3.classList.toggle('flex', state.scenario === 'S3');
+        ctrlS4.classList.toggle('hidden', state.scenario !== 'S4');
+        ctrlS4.classList.toggle('flex', state.scenario === 'S4');
+
+        s1TimeBadge.textContent = stepToHHMM(state.disturbStep[state.caseId]);
+        btnDisturb.textContent = state.caseId === 'A' ? 'Inject breakdown (1 h)' : 'Inject CHP trip (1 h)';
+        btnPlayPause.textContent = state.running ? 'Pause' : 'Play';
+        mismatchSlider.value = state.mismatchPct;
+        mismatchVal.textContent = `${state.mismatchPct}%`;
+        horizonSlider.value = state.horizonHours;
+        horizonVal.textContent = `${state.horizonHours} h (${state.horizonHours * 4} steps)`;
+        ruleInput.value = state.ruleText;
+
+        updateDynamicTelemetry();
+      }
+
+      /* -----------------------------------------------------------------------
+         13. INTERACTIVE EVENTS
+         ----------------------------------------------------------------------- */
+      btnCaseA.addEventListener('click', () => {
+        if (state.caseId === 'A') return;
+        state.caseId = 'A';
+        state.ruleText = S4_PRESETS.A[0];
+        setupDay(true);
+      });
+      btnCaseB.addEventListener('click', () => {
+        if (state.caseId === 'B') return;
+        state.caseId = 'B';
+        state.ruleText = S4_PRESETS.B[0];
+        setupDay(true);
+      });
+
+      scenarioBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+          state.scenario = btn.dataset.scenario;
+          state.horizonHours = 4;
+          setupDay(true);
+        });
+      });
+
+      btnPlayPause.addEventListener('click', () => {
+        state.running = !state.running;
+        btnPlayPause.textContent = state.running ? 'Pause' : 'Play';
+      });
+
+      btnReset.addEventListener('click', () => setupDay(true));
+      speedSelect.addEventListener('change', e => { state.speed = Number(e.target.value); });
+      btnDisturb.addEventListener('click', () => { state.outageTimer = 4; updateDynamicTelemetry(); });
+
+      mismatchSlider.addEventListener('input', e => {
+        state.mismatchPct = Number(e.target.value);
+        mismatchVal.textContent = `${state.mismatchPct}%`;
+        if (state.scenario === 'S2') { state.twinReparamDone = false; }
+      });
+      btnReparam.addEventListener('click', () => {
+        if (!state.twinReparamDone && state.twinReparamTimer === 0) {
+          state.twinReparamTimer = 4;
+          updateDynamicTelemetry();
+        }
+      });
+
+      horizonSlider.addEventListener('input', e => {
+        state.horizonHours = Number(e.target.value);
+        horizonVal.textContent = `${state.horizonHours} h (${state.horizonHours * 4} steps)`;
+      });
+
+      btnApplyRule.addEventListener('click', () => {
+        state.ruleText = ruleInput.value;
+        state.parsedRule = parseNaturalRule(state.ruleText, state.caseId);
+        state.baselineRuleEncoded = false;
+        rebuildRLValueGrids();
+        updateDynamicTelemetry();
+      });
+      btnPreset1.addEventListener('click', () => {
+        state.ruleText = S4_PRESETS[state.caseId][0];
+        ruleInput.value = state.ruleText;
+        state.parsedRule = parseNaturalRule(state.ruleText, state.caseId);
+        state.baselineRuleEncoded = false;
+        rebuildRLValueGrids();
+        updateDynamicTelemetry();
+      });
+      btnPreset2.addEventListener('click', () => {
+        state.ruleText = S4_PRESETS[state.caseId][1];
+        ruleInput.value = state.ruleText;
+        state.parsedRule = parseNaturalRule(state.ruleText, state.caseId);
+        state.baselineRuleEncoded = false;
+        rebuildRLValueGrids();
+        updateDynamicTelemetry();
+      });
+      btnEncodeRule.addEventListener('click', () => {
+        if (!state.baselineRuleEncoded && state.encodeTimer === 0) {
+          state.encodeTimer = 4;
+          updateDynamicTelemetry();
+        }
+      });
+
+      toggleHeatmap.addEventListener('change', e => { state.showHeatmap = e.target.checked; });
+      toggleRollouts.addEventListener('change', e => { state.showRollouts = e.target.checked; });
+
+      // Panel 1 disturbance dragging
+      function getCanvasPoint(evt) {
+        const rect = canvas.getBoundingClientRect();
+        const cx = evt.touches ? evt.touches[0].clientX : evt.clientX;
+        const cy = evt.touches ? evt.touches[0].clientY : evt.clientY;
+        return { x: ((cx - rect.left) / rect.width) * CANVAS_W, y: ((cy - rect.top) / rect.height) * CANVAS_H };
+      }
+
+      canvas.addEventListener('mousedown', evt => {
+        if (state.scenario !== 'S1') return;
+        const pt = getCanvasPoint(evt);
+        const dx = tToX(state.disturbStep[state.caseId]);
+        if (Math.abs(pt.x - dx) < 18 && pt.y >= 8 && pt.y <= 112) {
+          state.draggingDisturb = true;
+          canvas.style.cursor = 'grabbing';
+        }
+      });
+      window.addEventListener('mousemove', evt => {
+        const pt = getCanvasPoint(evt);
+        if (state.draggingDisturb) {
+          state.disturbStep[state.caseId] = xToT(pt.x);
+          s1TimeBadge.textContent = stepToHHMM(state.disturbStep[state.caseId]);
+          return;
+        }
+        if (state.scenario === 'S1') {
+          const dx = tToX(state.disturbStep[state.caseId]);
+          canvas.style.cursor = (Math.abs(pt.x - dx) < 16 && pt.y >= 8 && pt.y <= 112) ? 'grab' : 'default';
+        } else {
+          canvas.style.cursor = 'default';
+        }
+      });
+      window.addEventListener('mouseup', () => {
+        if (state.draggingDisturb) {
+          state.draggingDisturb = false;
+          canvas.style.cursor = 'default';
+        }
+      });
+
+      window.addEventListener('resize', () => { resizeCanvas(); renderCanvas(); });
+
+      /* -----------------------------------------------------------------------
+         14. ANIMATION LOOP (~45 s per 96-step day at 1x -> 468 ms / step)
+         ----------------------------------------------------------------------- */
+      function loop(now) {
+        const dtMs = state.lastTickMs ? Math.min(120, now - state.lastTickMs) : 16;
+        state.lastTickMs = now;
+        if (state.running) {
+          state.accumMs += dtMs * state.speed;
+          const stepInterval = 468;
+          while (state.accumMs >= stepInterval) {
+            state.accumMs -= stepInterval;
+            stepSimulation();
+          }
+        }
+        renderCanvas();
+        requestAnimationFrame(loop);
+      }
+
+      window.onload = function () {
+        try {
+          resizeCanvas();
+          setupDay(true);
+          requestAnimationFrame(loop);
+        } catch (err) {
+          console.error('Energy demonstrator init error:', err);
+        }
+      };
+    })();
+  </script>
+</body>
+</html>

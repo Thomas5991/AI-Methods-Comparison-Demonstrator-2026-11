@@ -1,0 +1,125 @@
+# Brief: Energy-Aware Planning & Control Demonstrator (derived from v2 robot demo)
+
+## Goal
+Transform the attached demonstrator "AI Architectures in Action: LLMs, JEPA, RL & MPC" from a 2D robot
+sandbox into a demonstrator for energy-aware production planning and plant dispatch with energy storage.
+Purpose: science communication for researchers / conference audiences (English). It must stay compact,
+self-explanatory, and fair. Every architecture shows a characteristic strength and failure mode that
+is computed by the simulation, not scripted as a cartoon.
+
+Reuse the existing file structure: header with architecture selector, 2-column workspace
+(left: simulation canvas, right: live pipeline, KPIs, "Why is it behaving this way?"), and a
+comparison matrix at the bottom. Keep the visual style: Tailwind CDN, light mode, Inter font.
+
+Title: "AI Architectures for Energy-Aware Planning & Control: MPC, LLMs, Learned World Models & RL"
+Subtitle: "Interactive digital-twin sandbox: industrial demand-side management and plant dispatch with storage"
+
+## Technical constraints
+- One self-contained HTML file, vanilla JS, canvas rendering, Tailwind via CDN, no other network calls.
+- Discrete-time simulation: 15-min steps, 24 h day = 96 steps, rolling "now" cursor, auto-loop with reset.
+  Default speed: about 45 s per simulated day. Keep Pause / Reset / speed control.
+- Behaviours must emerge from the implemented algorithms, using the minimal real implementations below.
+- Persistent disclaimer in the footer: "Stylized educational simulation. Controllers are simplified;
+  LLM behaviour is emulated (no live model call); the latent world model is conceptual (JEPA-type)."
+
+## Application case switch (toggle in the header): A | B
+
+### A. Industrial demand-side management (PPC)
+- Base load 0.8 MW, PV up to 1.0 MW_p (daily curve), grid import limit 1.5 MW, demand charge on the daily peak.
+- Day-ahead price curve with morning and evening peaks (about 60–250 €/MWh).
+- Battery: 2 MWh / 1 MW, round-trip efficiency 90 %.
+- Thermal storage: 3 MWh_th, charged by an e-boiler/heat pump of 0.8 MW_el; process heat demand profile.
+- Flexible jobs (Gantt rows): Furnace batch (600 kW, 3 h, deadline 18:00), Paint line (400 kW, 4 h,
+  window 06–20), Pre-cooling (300 kW, 2 h, before 14:00), Compressed-air buffer (200 kW, shiftable).
+- Decisions: job start times, battery and thermal-storage charge/discharge.
+- KPIs: energy cost (€), peak import (kW), deadline misses, limit violations.
+
+### B. Power plant dispatch (CHP plant with district heating)
+- CHP unit 50 MW_el / 60 MW_th, min load 40 %, ramp 10 % per 15 min, start-up cost.
+- Back-up gas boiler 40 MW_th; heat storage 400 MWh_th; district-heating demand 40–90 MW_th with a morning peak.
+- Electricity price curve as in A, scaled.
+- Decisions: CHP on/off and setpoint, boiler setpoint, heat-storage charge/discharge.
+- KPIs: net margin (€), unmet heat demand (MWh), ramp/min-load violations, starts.
+
+## Architectures (6 selector cards; Pixel-WM is removed)
+0. **Classical MPC (MILP + physics twin)**, the baseline. White-box first-principles model with nominal
+   parameters. Optimiser: dynamic programming over a discretised state (SoC/storage level × time) plus
+   enumeration of job start slots. Label it "MILP-type optimiser (stylized DP solver)".
+   Respects the user-set horizon. Reports "solver nodes" as its compute metric; these grow steeply with horizon.
+1. **LLM only**: emulated. Produces a schedule from plausible heuristics ("run flexible loads when price
+   is low", "charge before the evening peak") with rough quantities. Does NOT enforce energy balance,
+   power limits or storage bounds. Parses natural-language rules (see S4) correctly.
+2. **Learned latent WM + MPC** (JEPA-type, conceptual): sampling-based MPC (CEM or random shooting,
+   about 64 rollouts) over a learned dynamics model. "Learned" is implemented as online
+   recursive-least-squares estimation of the true plant parameters (storage capacity, efficiency,
+   thermal losses), so it tracks reality under model mismatch. No rule channel. Myopic beyond its horizon.
+3. **Hybrid: LLM + latent WM + MPC**: the LLM sets semantic subgoals and constraints (e.g. "SoC ≥ 80 %
+   by 16:00", injected rules); MPC executes them on the learned model.
+4. **Latent WM + RL + MPC** (TD-MPC2-style): adds a value function V(t, storage level) computed by
+   value iteration on the discretised grid, used as terminal cost. Solves the beyond-horizon
+   storage problem. The value function is trained on the old rules, so it stays stale after a rule shift.
+5. **Full triad: LLM + latent WM + RL + MPC**: as 4, plus LLM constraint injection that overrides the
+   stale value function when rules change.
+
+## Scenarios (4 tabs; the same semantics apply to both cases)
+**S1 Forecast disturbances**: a price spike, PV dip (A) or heat-demand surge (B) appears during the day.
+Users can drag the spike/dip on the timeline. Button "Inject disturbance": machine breakdown (A, the
+furnace stops for 1 h) or CHP trip (B, 1 h).
+
+**S2 Model mismatch**: the real plant deviates from the nominal twin. A slider sets the deviation from
+0 to 40 % (default 25 %): battery capacity fade and higher thermal losses (A); fouled-boiler efficiency
+and higher storage losses (B). The physics twin plans with nominal values, so storage hits its bounds
+earlier than planned and the KPIs show violations or deficits. A button "Engineer re-parametrises
+twin" fixes the baseline after a visible delay.
+
+**S3 Storage dilemma (beyond-horizon payoff)**: the evening price/demand peak (A) or the morning heat
+peak (B) lies beyond the default MPC horizon of 4 h. A horizon slider runs from 1 to 12 h. Charging now
+costs money and only pays off later, so myopic controllers never charge (the local optimum,
+analogous to the original Key & Gate scenario). The baseline solves it once the horizon reaches about
+8–10 h, but its solver nodes and compute time rise visibly. Make this trade-off explicit in the KPI panel.
+
+**S4 Rule shift (zero-shot)**: a natural-language instruction is injected mid-day through a text field
+with presets:
+- A: "Grid operator: cap import at 1.0 MW between 17:00 and 19:00" / "Furnace maintenance until 14:00"
+- B: "Redispatch request: CHP max 30 MW_el 16:00–20:00" / "Heat storage max 70 % (inspection)"
+Only the LLM architectures parse it instantly. The baseline needs the "Engineer encodes constraint"
+button (with a delay). Architectures without an LLM keep violating the rule.
+
+## Expected behaviour (must emerge; use this to verify the implementation)
+| Arch \ Scenario | S1 Disturbances | S2 Model mismatch | S3 Storage dilemma (4 h horizon) | S4 Rule shift |
+|---|---|---|---|---|
+| 0 Classical MPC | ✓ re-plans | ✗ violations until re-parametrised | ✗ at 4 h; ✓ at ≥ 8 h with high compute | ~ correct only after manual encoding |
+| 1 LLM only | ✗ late/infeasible | ✗ (no model) | ~ right idea, wrong amounts, limit violations | ~ obeys rule, breaks energy balance |
+| 2 WM + MPC | ✓ | ✓ tracks reality | ✗ myopic, never charges | ✗ ignores rule |
+| 3 LLM + WM + MPC | ✓ | ✓ | ✓ via subgoal | ✓ |
+| 4 WM + RL + MPC | ✓ | ✓ | ✓ via V(t, SoC) | ✗ stale policy violates |
+| 5 Full triad | ✓ | ✓ | ✓ best KPIs | ✓ |
+
+## Visualisation (left canvas: stacked panels with a shared time axis, 00–24 h, "now" cursor)
+1. Price curve, PV forecast (A) or heat demand (B), with a forecast uncertainty band ahead of "now".
+   Disturbances are draggable here.
+2. Gantt chart: job blocks (A) or unit-commitment bars (B); planned blocks are shown ghosted, executed ones solid.
+3. Power/heat balance: stacked load or generation against the grid limit, with the limit line and violations in red.
+4. Storage levels: battery SoC and thermal storage. Toggle "Show MPC rollouts" shows the fan of
+   candidate trajectories over the horizon. Toggle "Show RL value V(t, SoC)" shows a heatmap behind
+   this panel. This is the direct analogue of the original V(s) heatmap.
+Rule-constrained windows appear as hatched zones once they are known to the controller, and
+as red-outlined zones while they are ignored.
+
+## Right column
+- Live architecture pipeline (as in v2): highlight the active blocks (LLM → WM → RL critic → MPC → plant;
+  for the baseline: physics twin → MILP → plant).
+- KPI cards: case-specific KPIs (above), compute per step (rollouts or solver nodes, ms), violations, task status.
+- "Why is it behaving this way?": write concise, technically correct texts for every
+  architecture × scenario × case combination (6 × 4 × 2 = 48 texts, 2–3 sentences each).
+
+## Comparison matrix (bottom)
+Columns: Model basis | Beyond-horizon storage value | Robustness to model mismatch | Compute scaling with horizon |
+Zero-shot rule adaptation | Typical reference.
+References (generic, no overclaiming): MILP-based MPC (standard practice); LLM-to-optimisation
+formulation (e.g. OptiMUS); JEPA (LeCun / Meta I-JEPA, V-JEPA); TD-MPC2 (Hansen et al., 2024).
+
+## Quality bar
+- Do not make the baseline look artificially bad; its strengths (S1, long-horizon S3) must be visible.
+- No overlapping text and no layout shift when switching case or scenario; the layout must work at 1280×800 for projection.
+- All units shown explicitly (kW/MW, MWh, €, %).

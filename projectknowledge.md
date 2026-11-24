@@ -2,7 +2,9 @@
 
 ## Workspace Inventory
 - Workspace root: `c:\Users\TS\Antigravity_data\AI-Methods Comparison Demonstrator 2026-11` *(verified)*
-- `ai_architectures_in_action_llms_jepa_rl_mpc_demonstrator-v2.html` — 97,737 bytes, 2,218 lines *(verified)*
+- `ai_architectures_in_action_llms_jepa_rl_mpc_demonstrator-v2.html` — 97,737 bytes, 2,218 lines *(verified; untouched in Phase 2)*
+- `ai_architectures_energy_planning_demonstrator-v1.html` — self-contained Energy-Aware Planning & Control Demonstrator (Cases A & B, 6 architectures, 4 scenarios, 48 explanations) *(verified)*
+- `tests/verify_sim.js` (robot demo) & `tests/verify_energy_sim.js` (energy demo) *(verified)*
 - `Handover message.txt` — 4,143 bytes *(verified)*
 - `AGENTS.md`, `CLAUDE.md`, `tasklist.md`, `projectknowledge.md` — governance & state files *(verified)*
 - Git: local repository initialized on `main` with `origin` = `https://github.com/Thomas5991/AI-Methods-Comparison-Demonstrator-2026-11.git` *(verified)*
@@ -45,7 +47,11 @@ Key functions in `ai_architectures_in_action_llms_jepa_rl_mpc_demonstrator-v2.ht
 
 ## Decision Log
 - **2026-11-24:** Initialized project governance and state files (`AGENTS.md`, `CLAUDE.md`, `tasklist.md`, `projectknowledge.md`) per `kickoff/SKILL.md`.
-- **2026-11-24:** User approved in-place editing of `ai_architectures_in_action_llms_jepa_rl_mpc_demonstrator-v2.html`, local git setup with `origin` = `https://github.com/Thomas5991/AI-Methods-Comparison-Demonstrator-2026-11.git`, TD-MPC2 hybrid sampling (`warpedFrac = Math.sign(frac) * Math.pow(Math.abs(frac), 1.55)`, `spreadRad: 2.35`, `curve = -warpedFrac * 0.042`) + RL Critic cost calibration (`* 9` / `* 1000`), and Mode 4 `ruleshift` two-stage detour fix. Rationale: eliminates unintended RL-MPC collision artifacts while preserving 11/12 rollout budgets and all teaching behaviors.
+- **2026-11-24:** Built `ai_architectures_energy_planning_demonstrator-v1.html` as a new versioned file (preserving `-v2.html` robot demo untouched) with real DP solver (Arch 0), emulated heuristic LLM (Arch 1), online RLS parameter estimation + smooth block-CEM (Arch 2–3), and 35-bin Bellman `V(t, SoC)` + TD-MPC2 hybrid warm-started CEM (Arch 4–5), plus deterministic NL rule parser and 48 explanations.
+- **Post-Phase-2 Verified Metrics (`node tests/verify_energy_sim.js`, 2026-11-24):**
+  - All 48 `(6 arch × 4 scenario × 2 case)` assertions passed: Arch 0,2,3,4,5 achieve `0` violations in S1; Arch 0 fails S2 under 25% mismatch (`3` limViol in A, `51.39 MWh` unmet in B) and recovers to `0` after engineer re-parametrisation while Arch 2–5 adapt via RLS (`0` violations); Arch 3–5 and Arch 0 (`10 h`) solve S3 (`A`: `2267€` vs `2505€` myopic; `B`: `24,800€` vs `15,912€` myopic; Arch 0 nodes scale `4,646 → 34,592` in A, `19,773 → 150,880` in B); Arch 0,2,4 violate S4 while Arch 3 & 5 achieve `0` rule & physics violations.
+  - `node tests/verify_sim.js` regression passed (`ALL ASSERTIONS PASSED`).
+  - Live browser check at `1280×800` (`http://localhost:8766`, `BROWSER_HOST_FACTS` verified): 0 console errors, 0 layout shift, explicit units, `V(t, SoC)` heatmap & rollout fan, S4 red vs hatched windows, and S1 disturbance drag persistence confirmed.
 
 ## Open Questions
 - **Push approval:** Confirm whether to push local `main` commits to `origin` (`https://github.com/Thomas5991/AI-Methods-Comparison-Demonstrator-2026-11.git`) after Phase 1 verification completes.

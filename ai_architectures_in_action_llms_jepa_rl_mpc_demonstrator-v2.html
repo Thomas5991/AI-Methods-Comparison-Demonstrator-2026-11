@@ -975,9 +975,13 @@
 
         for (let i = 0; i < numRollouts; i++) {
           const frac = numRollouts === 1 ? 0 : (i / (numRollouts - 1)) * 2 - 1;
-          // Distribute candidates evenly across spreadRad; also mix slight curvature
-          const steerAngle = centerAngle + frac * spreadRad;
-          const curve = -frac * (useRLCritic ? 0.022 : 0.042);
+          // TD-MPC2 style: RL warm-start concentrates most samples near the Actor's
+          // gradient while keeping wide-angle exploratory/safety wings up to spreadRad
+          const warpedFrac = useRLCritic
+            ? Math.sign(frac) * Math.pow(Math.abs(frac), 1.55)
+            : frac;
+          const steerAngle = centerAngle + warpedFrac * spreadRad;
+          const curve = -warpedFrac * 0.042;
           const spd = 2.75;
 
           let sx = rob.x;
@@ -1019,7 +1023,7 @@
 
             // Running cost
             if (useRLCritic && valueGrid) {
-              cost -= sampleValue(valueGrid, sx, sy) * 18;
+              cost -= sampleValue(valueGrid, sx, sy) * 9;
             } else {
               cost += dist(sx, sy, targetX, targetY) * 0.08;
             }
@@ -1028,7 +1032,7 @@
           // Terminal cost: Either TD-learned Value Function -V(s_H) or direct distance to target
           if (useRLCritic && valueGrid) {
             const termV = sampleValue(valueGrid, sx, sy);
-            cost += (1 - termV) * 1800;
+            cost += (1 - termV) * 1000;
             // Subtle tie-breaker toward immediate target if close
             if (dist(sx, sy, targetX, targetY) < 75) {
               cost += dist(sx, sy, targetX, targetY) * 1.4;
@@ -1101,10 +1105,32 @@
             state.hybridMem.subgoal = 'Subgoal: Gate → Goal';
           }
         } else if (state.scenario === 'ruleshift') {
-          // LLM decomposes zero-shot safe waypoint below Blue Zone
-          if (state.robot.x < state.blueZone.x + state.blueZone.w + 18 && state.robot.y < state.blueZone.y + state.blueZone.h + 25) {
-            tx = state.blueZone.x + state.blueZone.w * 0.55;
-            ty = state.blueZone.y + state.blueZone.h + 48;
+          // LLM decomposes zero-shot two-stage safe detour around Forbidden Blue Zone
+          const bz = state.blueZone;
+          const topY = Math.max(44, bz.y - 46);
+          const botY = Math.min(ARENA_H - 44, bz.y + bz.h + 56);
+          const topBlocked = state.staticObs.some(
+            o => o.x > bz.x - 45 && o.x < bz.x + bz.w + 45 && Math.abs(o.y - topY) < o.r + 28
+          );
+          const useTop = !topBlocked && (state.robot.y <= bz.y + bz.h * 0.55);
+          if (state.robot.x < bz.x + bz.w + 22) {
+            if (useTop) {
+              if (state.robot.x < bz.x + 15 && state.robot.y > bz.y - 18) {
+                tx = Math.max(80, bz.x - 35);
+                ty = topY;
+              } else {
+                tx = bz.x + bz.w + 35;
+                ty = topY;
+              }
+            } else {
+              if (state.robot.x < bz.x + 15 && state.robot.y < bz.y + bz.h + 24) {
+                tx = Math.max(80, bz.x - 55);
+                ty = botY;
+              } else {
+                tx = bz.x + bz.w + 35;
+                ty = botY;
+              }
+            }
             state.hybridMem.subgoal = 'Zero-Shot: Detour Blue Zone';
           } else {
             state.hybridMem.subgoal = 'Zero-Shot: Safe → Goal';
@@ -1147,7 +1173,7 @@
           valueGrid: grid,
           warmStartAngle: actorProposalAngle,
           respectBlueZone: false, // Stale RL Critic/Actor ignores brand-new Blue Zone rule!
-          spreadRad: 1.35
+          spreadRad: 2.35
         });
 
         state.mpcMem.latencyMs = 8;
@@ -1181,7 +1207,7 @@
           valueGrid: grid,
           warmStartAngle: actorProposalAngle,
           respectBlueZone: true, // LLM enforces zero-shot Blue Zone constraint!
-          spreadRad: 1.45
+          spreadRad: 2.35
         });
 
         state.mpcMem.latencyMs = 10;

@@ -1,0 +1,2218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Architectures in Action: LLMs, JEPA, RL &amp; MPC Demonstrator</title>
+  <!-- Load Inter font and Tailwind CSS -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+            mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace']
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    /* Minimal custom styling for crisp light-mode polish and pulse indicator */
+    body {
+      background-color: #f8fafc;
+      color: #0f172a;
+      -webkit-font-smoothing: antialiased;
+    }
+    @keyframes subtlePulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.45; transform: scale(1.22); }
+    }
+    .live-dot {
+      animation: subtlePulse 1.6s ease-in-out infinite;
+    }
+    input[type="range"] {
+      accent-color: #0f172a;
+    }
+    canvas {
+      touch-action: none;
+    }
+  </style>
+</head>
+<body class="min-h-screen p-3 sm:p-5 lg:p-6">
+  <div class="max-w-[1400px] mx-auto space-y-5">
+
+    <!-- =======================================================================
+         TOP HEADER & 6-ARCHITECTURE SELECTOR
+         ======================================================================= -->
+    <header class="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 sm:p-5 space-y-4">
+      <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+        <div>
+          <div class="flex flex-wrap items-center gap-2">
+            <h1 class="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900">
+              AI Architectures in Action: LLMs, JEPA, RL &amp; MPC Demonstrator
+            </h1>
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+              Interactive 2D Robotics Sandbox
+            </span>
+          </div>
+          <p class="text-sm text-slate-600 mt-1">
+            Compare how reactive LLMs, pixel simulators, JEPA world models, Reinforcement Learning Critics/Actors, and Model Predictive Control interact across physical and symbolic tasks.
+            <span class="font-semibold text-slate-800">Note: MPC = Model Predictive Control (not MCP).</span>
+          </p>
+        </div>
+
+        <!-- Component Color Legend -->
+        <div class="flex flex-wrap items-center gap-1.5 text-xs font-semibold shrink-0">
+          <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+            <span class="w-2 h-2 rounded-full bg-indigo-600"></span>LLM
+          </span>
+          <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+            <span class="w-2 h-2 rounded-full bg-emerald-600"></span>JEPA
+          </span>
+          <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+            <span class="w-2 h-2 rounded-full bg-amber-500"></span>RL
+          </span>
+          <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+            <span class="w-2 h-2 rounded-full bg-blue-600"></span>MPC
+          </span>
+          <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-200">
+            <span class="w-2 h-2 rounded-full bg-rose-600"></span>Pixel-WM
+          </span>
+        </div>
+      </div>
+
+      <!-- 6 Quick Architecture Selector Pills -->
+      <div id="archSelector" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-2.5" role="tablist" aria-label="Select AI Architecture">
+        <!-- Populated dynamically via JS for crisp active-state management -->
+      </div>
+    </header>
+
+    <!-- =======================================================================
+         MAIN 2-COLUMN WORKSPACE (LEFT ~60% SANDBOX | RIGHT ~40% PIPELINE & TELEMETRY)
+         ======================================================================= -->
+    <main class="grid grid-cols-1 xl:grid-cols-12 gap-5 items-start">
+
+      <!-- LEFT COLUMN (~60% -> 7 of 12 cols) -->
+      <section class="xl:col-span-7 bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+        <!-- Scenario Tabs & Action Buttons -->
+        <div class="p-3.5 sm:p-4 border-b border-slate-200 bg-slate-50/70 space-y-3">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div id="scenarioTabs" class="flex flex-wrap gap-1.5" role="tablist" aria-label="Select Scenario">
+              <button data-scenario="dynamic" class="scenario-btn px-3 py-1.5 rounded-lg text-xs font-semibold border transition cursor-pointer">
+                1. Dynamic Obstacles
+              </button>
+              <button data-scenario="noise" class="scenario-btn px-3 py-1.5 rounded-lg text-xs font-semibold border transition cursor-pointer">
+                2. High-Noise Env
+              </button>
+              <button data-scenario="keygate" class="scenario-btn px-3 py-1.5 rounded-lg text-xs font-semibold border transition cursor-pointer">
+                3. Key &amp; Gate (Local Min)
+              </button>
+              <button data-scenario="ruleshift" class="scenario-btn px-3 py-1.5 rounded-lg text-xs font-semibold border transition cursor-pointer">
+                4. Zero-Shot Rule Shift
+              </button>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-1.5">
+              <button id="btnPlayPause" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-900 text-white hover:bg-slate-800 transition cursor-pointer">
+                Pause
+              </button>
+              <button id="btnReset" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white text-slate-700 border border-slate-300 hover:bg-slate-100 transition cursor-pointer">
+                Reset
+              </button>
+              <button id="btnPerturb" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 transition cursor-pointer">
+                Inject Physical Perturbation
+              </button>
+            </div>
+          </div>
+
+          <!-- Controls Bar: Noise Slider & Visual Layer Toggles -->
+          <div class="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-200/80 text-xs">
+            <div class="flex items-center gap-2.5 flex-1 min-w-[230px]">
+              <label for="noiseSlider" class="font-semibold text-slate-700 whitespace-nowrap">
+                Irrelevant Pixel Noise:
+              </label>
+              <input id="noiseSlider" type="range" min="0" max="100" value="15" class="w-full max-w-[200px] cursor-pointer" />
+              <span id="noiseVal" class="font-mono font-bold text-slate-900 w-9 text-right">15%</span>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-4">
+              <label class="inline-flex items-center gap-1.5 font-semibold text-slate-700 cursor-pointer select-none">
+                <input id="toggleHeatmap" type="checkbox" checked class="rounded border-slate-300 text-amber-600 focus:ring-amber-500 cursor-pointer" />
+                <span>Show RL Value Heatmap V(s)</span>
+              </label>
+              <label class="inline-flex items-center gap-1.5 font-semibold text-slate-700 cursor-pointer select-none">
+                <input id="toggleRollouts" type="checkbox" checked class="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer" />
+                <span>Show MPC Rollouts</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2D Canvas Arena -->
+        <div class="p-3.5 sm:p-4 space-y-3">
+          <div id="canvasWrapper" class="relative w-full aspect-[640/400] bg-white border border-slate-300 rounded-xl overflow-hidden shadow-inner">
+            <canvas id="simCanvas" class="block w-full h-full"></canvas>
+          </div>
+
+          <!-- Arena Legend & Interaction Hint -->
+          <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600 px-0.5">
+            <div class="flex flex-wrap items-center gap-x-3.5 gap-y-1.5">
+              <span class="inline-flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-slate-900 inline-block"></span>Robot</span>
+              <span class="inline-flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span>Goal</span>
+              <span class="inline-flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block"></span>Moving Obstacle</span>
+              <span class="inline-flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-slate-500 inline-block"></span>Static Obstacle</span>
+              <span id="legendKey" class="hidden inline-flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-amber-400 border border-amber-700 inline-block"></span>Key &amp; Gate</span>
+              <span id="legendBlueZone" class="hidden inline-flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm bg-blue-200 border border-blue-600 inline-block"></span>Forbidden Blue Zone</span>
+            </div>
+            <span class="text-slate-500 font-medium">Tip: Drag any obstacle on the arena</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- RIGHT COLUMN (~40% -> 5 of 12 cols) -->
+      <aside class="xl:col-span-5 space-y-4">
+
+        <!-- Live Architecture Pipeline Diagram -->
+        <section class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+          <div class="px-4 py-3 border-b border-slate-200 bg-slate-50/70 flex items-center justify-between gap-2">
+            <h2 class="text-sm font-bold text-slate-900">Live Architecture Pipeline</h2>
+            <span id="pipelineModeBadge" class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+              Autoregressive LLM
+            </span>
+          </div>
+          <div id="pipelineContainer" class="p-3.5 space-y-2">
+            <!-- Dynamically rendered 4-layer pipeline cards -->
+          </div>
+        </section>
+
+        <!-- Live Telemetry Cards (2x2 Grid) -->
+        <section class="grid grid-cols-2 gap-3">
+          <div class="bg-white border border-slate-200 rounded-xl p-3 shadow-sm">
+            <div class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Step Compute</div>
+            <div class="mt-1 flex items-baseline justify-between">
+              <span id="metricLatency" class="text-lg font-extrabold font-mono text-slate-900">14 ms</span>
+              <span id="metricLatencyNote" class="text-[11px] font-medium text-slate-500">Per step</span>
+            </div>
+          </div>
+
+          <div class="bg-white border border-slate-200 rounded-xl p-3 shadow-sm">
+            <div class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">MPC Rollouts / Step</div>
+            <div class="mt-1 flex items-baseline justify-between">
+              <span id="metricRollouts" class="text-lg font-extrabold font-mono text-slate-900">0</span>
+              <span id="metricRolloutsNote" class="text-[11px] font-medium text-slate-500">No MPC</span>
+            </div>
+          </div>
+
+          <div class="bg-white border border-slate-200 rounded-xl p-3 shadow-sm">
+            <div class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Collisions / Violations</div>
+            <div class="mt-1 flex items-baseline justify-between">
+              <span id="metricViolations" class="text-lg font-extrabold font-mono text-slate-900">0 / 0</span>
+              <span id="metricGoals" class="text-[11px] font-semibold text-emerald-700">0 Goals</span>
+            </div>
+          </div>
+
+          <div class="bg-white border border-slate-200 rounded-xl p-3 shadow-sm">
+            <div class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Task Status</div>
+            <div id="metricStatusWrap" class="mt-1">
+              <span id="metricStatus" class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold bg-slate-100 text-slate-800">
+                Navigating
+              </span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Dynamic "Why is it behaving this way?" Explanation Box -->
+        <section id="explainCard" class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-1.5">
+          <div class="flex items-center justify-between gap-2">
+            <h3 class="text-xs font-extrabold uppercase tracking-wider text-slate-700">
+              Why is it behaving this way?
+            </h3>
+            <span id="explainTag" class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+              Live Insight
+            </span>
+          </div>
+          <p id="explainText" class="text-sm text-slate-700 leading-relaxed"></p>
+        </section>
+      </aside>
+    </main>
+
+    <!-- =======================================================================
+         BOTTOM SECTION: 6-ARCHITECTURE COMPARISON MATRIX
+         ======================================================================= -->
+    <section class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+      <div class="px-4 py-3 border-b border-slate-200 bg-slate-50/70 flex flex-wrap items-center justify-between gap-2">
+        <h2 class="text-sm font-bold text-slate-900">6-Architecture Comparison Matrix</h2>
+        <span class="text-xs text-slate-500 font-medium">Currently selected architecture is highlighted</span>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse text-xs sm:text-sm">
+          <thead>
+            <tr class="bg-slate-50 border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-500 font-bold">
+              <th class="py-3 px-4 whitespace-nowrap">Architecture</th>
+              <th class="py-3 px-4">Representation Space</th>
+              <th class="py-3 px-4">Solves Non-Convex Local Optima?</th>
+              <th class="py-3 px-4">Noise Robustness</th>
+              <th class="py-3 px-4">Compute / MPC Overhead</th>
+              <th class="py-3 px-4">Zero-Shot Rule Adaptation</th>
+              <th class="py-3 px-4 whitespace-nowrap">Real-World Reference</th>
+            </tr>
+          </thead>
+          <tbody id="matrixBody" class="divide-y divide-slate-200">
+            <!-- Populated cleanly via JS -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- =========================================================================
+       COMPLETE SIMULATION ENGINE, VALUE ITERATION, MPC SAMPLER & UI LOGIC
+       ========================================================================= -->
+  <script>
+    (function () {
+      'use strict';
+
+      /* -----------------------------------------------------------------------
+         1. ARCHITECTURE & METADATA DEFINITIONS
+         ----------------------------------------------------------------------- */
+      const ARENA_W = 640;
+      const ARENA_H = 400;
+
+      // Grid resolution for genuine 2D Bellman / TD Value Function V(s)
+      const GRID_COLS = 32;
+      const GRID_ROWS = 20;
+      const CELL_W = ARENA_W / GRID_COLS;
+      const CELL_H = ARENA_H / GRID_ROWS;
+
+      const ARCHS = [
+        {
+          id: 'llm',
+          shortTitle: '1. Autoregressive LLM',
+          subtitle: 'Reactive token policy',
+          badges: [{ label: 'LLM', cls: 'bg-indigo-600' }],
+          accentHex: '#4f46e5',
+          activeCardCls: 'border-indigo-500 bg-indigo-50/70 ring-2 ring-indigo-200',
+          rowHighlightCls: 'bg-indigo-50/70',
+          matrix: {
+            rep: 'Discrete language / action tokens',
+            localOpt: 'Partially (understands rules, poor continuous control)',
+            noise: 'Moderate (prompt/VLM jitter)',
+            compute: 'Constant / token (0 MPC rollouts)',
+            zeroShot: 'High (reads new rules immediately)',
+            ref: 'GPT-4o / RT-2 / VLA'
+          }
+        },
+        {
+          id: 'pixel',
+          shortTitle: '2. Pixel-Space WM',
+          subtitle: 'Generative video predictor',
+          badges: [{ label: 'Pixel-WM', cls: 'bg-rose-600' }],
+          accentHex: '#e11d48',
+          activeCardCls: 'border-rose-500 bg-rose-50/70 ring-2 ring-rose-200',
+          rowHighlightCls: 'bg-rose-50/70',
+          matrix: {
+            rep: 'Raw RGB video frames / pixels',
+            localOpt: 'No (short blurry horizon)',
+            noise: 'Very Low (wastes capacity on noise)',
+            compute: 'Very High (heavy pixel diffusion)',
+            zeroShot: 'Low (no symbolic rule parser)',
+            ref: 'UniSim / Sora-like WM'
+          }
+        },
+        {
+          id: 'jepa_mpc',
+          shortTitle: '3. JEPA + MPC',
+          subtitle: 'Latent WM + flat search',
+          badges: [
+            { label: 'JEPA', cls: 'bg-emerald-600' },
+            { label: 'MPC', cls: 'bg-blue-600' }
+          ],
+          accentHex: '#059669',
+          activeCardCls: 'border-emerald-500 bg-emerald-50/70 ring-2 ring-emerald-200',
+          rowHighlightCls: 'bg-emerald-50/70',
+          matrix: {
+            rep: 'Compact noise-free latent s_t',
+            localOpt: 'No (trapped at locked gate)',
+            noise: 'Very High (encoder strips clutter)',
+            compute: 'High MPC (36 rollouts/step)',
+            zeroShot: 'Low (needs external cost spec)',
+            ref: 'V-JEPA 2 + MPC'
+          }
+        },
+        {
+          id: 'llm_jepa_mpc',
+          shortTitle: '4. Hybrid: LLM+JEPA+MPC',
+          subtitle: 'Semantic subgoals + physics',
+          badges: [
+            { label: 'LLM', cls: 'bg-indigo-600' },
+            { label: 'JEPA', cls: 'bg-emerald-600' },
+            { label: 'MPC', cls: 'bg-blue-600' }
+          ],
+          accentHex: '#4f46e5',
+          activeCardCls: 'border-indigo-500 bg-indigo-50/70 ring-2 ring-indigo-200',
+          rowHighlightCls: 'bg-indigo-50/60',
+          matrix: {
+            rep: 'Language subgoals + JEPA latent s_t',
+            localOpt: 'Yes (LLM decomposes Key -> Gate)',
+            noise: 'Very High (JEPA filters pixels)',
+            compute: 'Moderate-High (36 unprimed rollouts)',
+            zeroShot: 'Very High (instant constraint injection)',
+            ref: 'VLA-JEPA / SayCan + WM'
+          }
+        },
+        {
+          id: 'jepa_rl_mpc',
+          shortTitle: '5. JEPA + RL + MPC',
+          subtitle: 'TD-MPC2 / TD-JEPA (no LLM)',
+          badges: [
+            { label: 'JEPA', cls: 'bg-emerald-600' },
+            { label: 'RL', cls: 'bg-amber-500' },
+            { label: 'MPC', cls: 'bg-blue-600' }
+          ],
+          accentHex: '#d97706',
+          activeCardCls: 'border-amber-500 bg-amber-50/70 ring-2 ring-amber-200',
+          rowHighlightCls: 'bg-amber-50/70',
+          matrix: {
+            rep: 'JEPA latent s_t + RL Value V(s)',
+            localOpt: 'Yes (TD Critic V(s) guides detour)',
+            noise: 'Very High (JEPA filters pixels)',
+            compute: 'Low (11 RL warm-start rollouts)',
+            zeroShot: 'Poor (stale reward policy fails)',
+            ref: 'TD-MPC2 / TD-JEPA'
+          }
+        },
+        {
+          id: 'full_triad',
+          shortTitle: '6. Full Triad: LLM+JEPA+RL+MPC',
+          subtitle: 'RL + LLM + World Model',
+          badges: [
+            { label: 'LLM', cls: 'bg-indigo-600' },
+            { label: 'JEPA', cls: 'bg-emerald-600' },
+            { label: 'RL', cls: 'bg-amber-500' },
+            { label: 'MPC', cls: 'bg-blue-600' }
+          ],
+          accentHex: '#2563eb',
+          activeCardCls: 'border-blue-600 bg-blue-50/70 ring-2 ring-blue-200',
+          rowHighlightCls: 'bg-blue-50/70',
+          matrix: {
+            rep: 'Symbolic + Latent s_t + Value V(s)',
+            localOpt: 'Yes (LLM + TD Critic synergy)',
+            noise: 'Very High (JEPA filters pixels)',
+            compute: 'Low (12 warm-start rollouts + rare LLM)',
+            zeroShot: 'Very High (LLM overrides stale RL)',
+            ref: 'Full Embodied Triad'
+          }
+        }
+      ];
+
+      /* -----------------------------------------------------------------------
+         2. GLOBAL SIMULATION STATE
+         ----------------------------------------------------------------------- */
+      const state = {
+        arch: 'llm',           // 'llm' | 'pixel' | 'jepa_mpc' | 'llm_jepa_mpc' | 'jepa_rl_mpc' | 'full_triad'
+        scenario: 'dynamic',   // 'dynamic' | 'noise' | 'keygate' | 'ruleshift'
+        noiseLevel: 15,        // 0..100
+        showHeatmap: true,
+        showRollouts: true,
+        running: true,
+        step: 0,
+
+        // Counters & statuses
+        goals: 0,
+        collisions: 0,
+        ruleViolations: 0,
+        collisionCooldown: 0,
+        violationCooldown: 0,
+        goalResetTimer: 0,
+        inBlueZoneNow: false,
+        stuckAtGate: false,
+        calloutLabel: '',
+        calloutTone: 'neutral', // 'neutral' | 'warn' | 'danger' | 'success' | 'info'
+        perturbRing: null,
+
+        // Agent & Goal
+        robot: { x: 64, y: 210, vx: 0, vy: 0, r: 13, angle: 0, trail: [] },
+        goal: { x: 576, y: 210, r: 18 },
+
+        // Obstacles & Walls
+        staticObs: [],
+        movingObs: [],
+        dividerWall: null, // Optional alcove wall in Scenario 3
+        key: { x: 135, y: 62, r: 12, collected: false },
+        gate: { x: 430, y: 12, w: 14, h: 376, openProgress: 0 },
+        blueZone: { x: 210, y: 95, w: 165, h: 175, active: false },
+
+        // Visual noise particles (purely visual, 0 physical effect)
+        noiseParticles: [],
+
+        // Controller internal memory
+        llmMem: { token: 'INIT', timer: 0, drift: 0 },
+        pixelMem: { cooldown: 0, vx: 0, vy: 0, ghost: [] },
+        mpcMem: { rollouts: [], best: null, rolloutCount: 0, latencyMs: 12 },
+        hybridMem: { subgoal: 'Reach Goal' },
+
+        // Genuine 2D Grid RL Value Function V(s) [row][col] normalized 0..1
+        valueGridPre: [],
+        valueGridPost: [],
+        valueGridStale: [],
+        valueGridSafe: [],
+
+        // Persisted user-moved obstacle positions per scenario
+        customObstacles: {},
+
+        // Pointer drag state (supports dragging both static and moving obstacles)
+        dragObj: null,
+        dragIsMoving: false,
+        dragOffsetX: 0,
+        dragOffsetY: 0
+      };
+
+      /* -----------------------------------------------------------------------
+         3. DOM REFERENCES
+         ----------------------------------------------------------------------- */
+      const canvas = document.getElementById('simCanvas');
+      const ctx = canvas.getContext('2d');
+      const canvasWrapper = document.getElementById('canvasWrapper');
+
+      const archSelector = document.getElementById('archSelector');
+      const scenarioBtns = document.querySelectorAll('.scenario-btn');
+      const btnPlayPause = document.getElementById('btnPlayPause');
+      const btnReset = document.getElementById('btnReset');
+      const btnPerturb = document.getElementById('btnPerturb');
+      const noiseSlider = document.getElementById('noiseSlider');
+      const noiseVal = document.getElementById('noiseVal');
+      const toggleHeatmap = document.getElementById('toggleHeatmap');
+      const toggleRollouts = document.getElementById('toggleRollouts');
+
+      const legendKey = document.getElementById('legendKey');
+      const legendBlueZone = document.getElementById('legendBlueZone');
+      const pipelineModeBadge = document.getElementById('pipelineModeBadge');
+      const pipelineContainer = document.getElementById('pipelineContainer');
+
+      const metricLatency = document.getElementById('metricLatency');
+      const metricLatencyNote = document.getElementById('metricLatencyNote');
+      const metricRollouts = document.getElementById('metricRollouts');
+      const metricRolloutsNote = document.getElementById('metricRolloutsNote');
+      const metricViolations = document.getElementById('metricViolations');
+      const metricGoals = document.getElementById('metricGoals');
+      const metricStatus = document.getElementById('metricStatus');
+      const explainTag = document.getElementById('explainTag');
+      const explainText = document.getElementById('explainText');
+      const matrixBody = document.getElementById('matrixBody');
+
+      /* -----------------------------------------------------------------------
+         4. GEOMETRY & PHYSICS HELPERS
+         ----------------------------------------------------------------------- */
+      function dist(ax, ay, bx, by) {
+        return Math.hypot(ax - bx, ay - by);
+      }
+      function clamp(v, lo, hi) {
+        return Math.max(lo, Math.min(hi, v));
+      }
+
+      function getMovingObsPos(obs, stepOffset) {
+        const t = state.step + stepOffset;
+        return {
+          x: obs.baseX,
+          y: clamp(obs.baseY + Math.sin(t * obs.speed + obs.phase) * obs.ampY, obs.r + 12, ARENA_H - obs.r - 12),
+          r: obs.r
+        };
+      }
+
+      function hitsRect(x, y, r, rect) {
+        if (!rect) return false;
+        const closestX = clamp(x, rect.x, rect.x + rect.w);
+        const closestY = clamp(y, rect.y, rect.y + rect.h);
+        return dist(x, y, closestX, closestY) < r;
+      }
+
+      function isInBlueZone(x, y, margin = 0) {
+        if (!state.blueZone.active) return false;
+        const bz = state.blueZone;
+        return (
+          x > bz.x - margin &&
+          x < bz.x + bz.w + margin &&
+          y > bz.y - margin &&
+          y < bz.y + bz.h + margin
+        );
+      }
+
+      function hitsGate(x, y, r) {
+        if (state.scenario !== 'keygate') return false;
+        if (state.gate.openProgress > 0.78) return false;
+        const g = state.gate;
+        const gapHalf = g.openProgress * 74;
+        const midY = ARENA_H / 2 + 10;
+        if (Math.abs(y - midY) < gapHalf - r) return false;
+        return hitsRect(x, y, r, g);
+      }
+
+      /* -----------------------------------------------------------------------
+         5. GENUINE 2D BELLMAN / TD VALUE ITERATION FOR RL CRITIC V(s)
+         ----------------------------------------------------------------------- */
+      function computeValueGrid(targetX, targetY, blockGate, avoidBlueZone) {
+        // Initialize grid with -Infinity, target cell = 1.0, run Bellman backup with discount gamma=0.93
+        const grid = Array.from({ length: GRID_ROWS }, () => new Float32Array(GRID_COLS));
+        const blocked = Array.from({ length: GRID_ROWS }, () => new Uint8Array(GRID_COLS));
+
+        for (let r = 0; r < GRID_ROWS; r++) {
+          for (let c = 0; c < GRID_COLS; c++) {
+            const cx = (c + 0.5) * CELL_W;
+            const cy = (r + 0.5) * CELL_H;
+            let isWall = false;
+
+            if (state.dividerWall && hitsRect(cx, cy, 10, state.dividerWall)) isWall = true;
+            if (blockGate && state.scenario === 'keygate' && hitsRect(cx, cy, 10, state.gate)) isWall = true;
+            if (avoidBlueZone && isInBlueZone(cx, cy, 10)) isWall = true;
+            for (const obs of state.staticObs) {
+              if (dist(cx, cy, obs.x, obs.y) < obs.r + 8) isWall = true;
+            }
+            if (isWall) blocked[r][c] = 1;
+          }
+        }
+
+        const tc = clamp(Math.floor(targetX / CELL_W), 0, GRID_COLS - 1);
+        const tr = clamp(Math.floor(targetY / CELL_H), 0, GRID_ROWS - 1);
+        grid[tr][tc] = 1.0;
+        blocked[tr][tc] = 0;
+
+        // 8-neighbor iterative Bellman backup (converges cleanly in ~48 sweeps on 32x20 grid)
+        const dirs = [
+          [1, 0, 0.945], [-1, 0, 0.945], [0, 1, 0.945], [0, -1, 0.945],
+          [1, 1, 0.923], [-1, 1, 0.923], [1, -1, 0.923], [-1, -1, 0.923]
+        ];
+
+        for (let iter = 0; iter < 55; iter++) {
+          for (let r = 0; r < GRID_ROWS; r++) {
+            for (let c = 0; c < GRID_COLS; c++) {
+              if (blocked[r][c] || (r === tr && c === tc)) continue;
+              let best = grid[r][c];
+              for (let d = 0; d < dirs.length; d++) {
+                const nr = r + dirs[d][0];
+                const nc = c + dirs[d][1];
+                if (nr >= 0 && nr < GRID_ROWS && nc >= 0 && nc < GRID_COLS && !blocked[nr][nc]) {
+                  const cand = grid[nr][nc] * dirs[d][2];
+                  if (cand > best) best = cand;
+                }
+              }
+              grid[r][c] = best;
+            }
+          }
+        }
+        return grid;
+      }
+
+      function rebuildValueGrids() {
+        if (state.scenario === 'keygate') {
+          // Pre-key RL Critic V(s): TD-learning propagated high value backward to the Key alcove!
+          state.valueGridPre = computeValueGrid(state.key.x, state.key.y, true, false);
+          // Post-key RL Critic V(s): Gate unlocked -> high value leads straight to Goal
+          state.valueGridPost = computeValueGrid(state.goal.x, state.goal.y, false, false);
+        } else if (state.scenario === 'ruleshift') {
+          // Stale RL Critic V(s): Trained on OLD reward (ignores the newly announced Forbidden Blue Zone!)
+          state.valueGridStale = computeValueGrid(state.goal.x, state.goal.y, false, false);
+          // LLM-masked Value V(s) for Full Triad: Respects zero-shot Forbidden Blue Zone rule
+          state.valueGridSafe = computeValueGrid(state.goal.x, state.goal.y, false, true);
+        } else {
+          state.valueGridPost = computeValueGrid(state.goal.x, state.goal.y, false, false);
+        }
+      }
+
+      function getActiveValueGrid() {
+        if (state.scenario === 'keygate') {
+          return state.key.collected ? state.valueGridPost : state.valueGridPre;
+        }
+        if (state.scenario === 'ruleshift') {
+          // Mode 5 (JEPA + RL + MPC) uses STALE value grid; Mode 6 (Full Triad) uses LLM-masked safe grid
+          return state.arch === 'full_triad' ? state.valueGridSafe : state.valueGridStale;
+        }
+        return state.valueGridPost;
+      }
+
+      function sampleValue(grid, x, y) {
+        if (!grid || !grid.length) return 0;
+        const fc = clamp(x / CELL_W - 0.5, 0, GRID_COLS - 1.001);
+        const fr = clamp(y / CELL_H - 0.5, 0, GRID_ROWS - 1.001);
+        const c0 = Math.floor(fc);
+        const r0 = Math.floor(fr);
+        const dc = fc - c0;
+        const dr = fr - r0;
+        const v00 = grid[r0][c0];
+        const v10 = grid[r0][c0 + 1];
+        const v01 = grid[r0 + 1][c0];
+        const v11 = grid[r0 + 1][c0 + 1];
+        const top = v00 * (1 - dc) + v10 * dc;
+        const bot = v01 * (1 - dc) + v11 * dc;
+        return top * (1 - dr) + bot * dr;
+      }
+
+      function sampleValueGradientAngle(grid, x, y) {
+        const eps = 12;
+        const vx = sampleValue(grid, x + eps, y) - sampleValue(grid, x - eps, y);
+        const vy = sampleValue(grid, x, y + eps) - sampleValue(grid, x, y - eps);
+        if (Math.hypot(vx, vy) < 1e-5) {
+          return Math.atan2(state.goal.y - y, state.goal.x - x);
+        }
+        return Math.atan2(vy, vx);
+      }
+
+      /* -----------------------------------------------------------------------
+         6. SCENARIO INITIALIZATION
+         ----------------------------------------------------------------------- */
+      function initNoiseParticles() {
+        state.noiseParticles = [];
+        for (let i = 0; i < 180; i++) {
+          state.noiseParticles.push({
+            x: Math.random() * ARENA_W,
+            y: Math.random() * ARENA_H,
+            vx: (Math.random() - 0.5) * 1.6,
+            vy: (Math.random() - 0.5) * 1.6,
+            size: 3 + Math.random() * 9,
+            phase: Math.random() * Math.PI * 2,
+            kind: i % 3
+          });
+        }
+      }
+
+      function saveCustomObstacles() {
+        state.customObstacles[state.scenario] = {
+          staticObs: state.staticObs.map(o => ({ x: o.x, y: o.y })),
+          movingObs: state.movingObs.map(o => ({ baseX: o.baseX, baseY: o.baseY }))
+        };
+      }
+
+      function applyCustomObstacles() {
+        const saved = state.customObstacles[state.scenario];
+        if (!saved) return;
+        if (saved.staticObs) {
+          state.staticObs.forEach((obs, i) => {
+            if (saved.staticObs[i]) {
+              obs.x = saved.staticObs[i].x;
+              obs.y = saved.staticObs[i].y;
+            }
+          });
+        }
+        if (saved.movingObs) {
+          state.movingObs.forEach((obs, i) => {
+            if (saved.movingObs[i]) {
+              obs.baseX = saved.movingObs[i].baseX;
+              obs.baseY = saved.movingObs[i].baseY;
+              const pos = getMovingObsPos(obs, 0);
+              obs.x = pos.x;
+              obs.y = pos.y;
+            }
+          });
+        }
+      }
+
+      function setupScenario(resetStats = false) {
+        state.dragObj = null;
+        canvas.style.cursor = 'default';
+        if (resetStats) {
+          state.goals = 0;
+          state.collisions = 0;
+          state.ruleViolations = 0;
+          state.step = 0;
+        }
+        state.collisionCooldown = 0;
+        state.violationCooldown = 0;
+        state.goalResetTimer = 0;
+        state.inBlueZoneNow = false;
+        state.stuckAtGate = false;
+        state.perturbRing = null;
+
+        state.robot = { x: 64, y: 210, vx: 0, vy: 0, r: 13, angle: 0, trail: [] };
+        state.goal = { x: 576, y: 210, r: 18 };
+        state.key = { x: 132, y: 58, r: 12, collected: false };
+        state.gate = { x: 432, y: 12, w: 14, h: 376, openProgress: 0 };
+        state.dividerWall = null;
+        state.blueZone = { x: 225, y: 100, w: 175, h: 175, active: false };
+
+        state.llmMem = { token: 'INIT_POLICY', timer: 0, drift: 0 };
+        state.pixelMem = { cooldown: 0, vx: 0, vy: 0, ghost: [] };
+        state.mpcMem = { rollouts: [], best: null, rolloutCount: 0, latencyMs: 10 };
+
+        if (state.scenario === 'dynamic') {
+          state.staticObs = [
+            { x: 205, y: 140, r: 22 },
+            { x: 400, y: 260, r: 22 }
+          ];
+          state.movingObs = [
+            { baseX: 310, baseY: 200, x: 310, y: 200, r: 20, ampY: 122, speed: 0.044, phase: 0, vy: 0 },
+            { baseX: 470, baseY: 200, x: 470, y: 200, r: 18, ampY: 112, speed: 0.052, phase: 2.1, vy: 0 }
+          ];
+        } else if (state.scenario === 'noise') {
+          state.staticObs = [
+            { x: 215, y: 250, r: 23 },
+            { x: 410, y: 150, r: 23 }
+          ];
+          state.movingObs = [
+            { baseX: 315, baseY: 200, x: 315, y: 200, r: 20, ampY: 125, speed: 0.045, phase: 0.9, vy: 0 }
+          ];
+        } else if (state.scenario === 'keygate') {
+          // Detour alcove: Key is up and slightly behind/away from direct horizontal line to Goal
+          state.robot.x = 120;
+          state.robot.y = 250;
+          state.key = { x: 112, y: 54, r: 12, collected: false };
+          state.dividerWall = { x: 185, y: 105, w: 14, h: 115 };
+          state.staticObs = [
+            { x: 295, y: 285, r: 20 }
+          ];
+          state.movingObs = [
+            { baseX: 330, baseY: 165, x: 330, y: 165, r: 17, ampY: 78, speed: 0.038, phase: 0.5, vy: 0 }
+          ];
+        } else if (state.scenario === 'ruleshift') {
+          // Forbidden Blue Zone directly blocks the previously optimal middle path!
+          state.robot.x = 64;
+          state.robot.y = 190;
+          state.goal.x = 576;
+          state.goal.y = 190;
+          state.blueZone = { x: 215, y: 100, w: 185, h: 175, active: true };
+          state.staticObs = [
+            { x: 155, y: 290, r: 18 }
+          ];
+          state.movingObs = [
+            { baseX: 465, baseY: 200, x: 465, y: 200, r: 18, ampY: 115, speed: 0.042, phase: 1.2, vy: 0 }
+          ];
+        }
+
+        applyCustomObstacles();
+
+        legendKey.classList.toggle('hidden', state.scenario !== 'keygate');
+        legendBlueZone.classList.toggle('hidden', state.scenario !== 'ruleshift');
+
+        rebuildValueGrids();
+        updateAllUI();
+      }
+
+      /* -----------------------------------------------------------------------
+         7. SIX ARCHITECTURE CONTROLLERS
+         ----------------------------------------------------------------------- */
+
+      // --- MODE 1: Autoregressive LLM (Reactive Discrete Token Policy) ---
+      function stepLLM() {
+        const rob = state.robot;
+        const lm = state.llmMem;
+        state.mpcMem.rollouts = [];
+        state.mpcMem.best = null;
+        state.mpcMem.rolloutCount = 0;
+        state.mpcMem.latencyMs = 22 + Math.round(state.noiseLevel * 0.06);
+        state.stuckAtGate = false;
+
+        let tx = state.goal.x;
+        let ty = state.goal.y;
+        let tag = 'GOAL';
+
+        if (state.scenario === 'keygate' && !state.key.collected) {
+          tx = state.key.x;
+          ty = state.key.y;
+          tag = 'KEY';
+        }
+
+        // LLM understands Scenario 4 Blue Zone rule semantically, tries to route below it
+        if (state.scenario === 'ruleshift' && rob.x < state.blueZone.x + state.blueZone.w + 15 && rob.y < state.blueZone.y + state.blueZone.h + 22) {
+          tx = state.blueZone.x + state.blueZone.w * 0.65;
+          ty = state.blueZone.y + state.blueZone.h + 44;
+          tag = 'AVOID_BLUE';
+        }
+
+        lm.timer--;
+        if (lm.timer <= 0) {
+          lm.timer = 7;
+          const dx = tx - rob.x;
+          const dy = ty - rob.y;
+          let ang = Math.atan2(dy, dx);
+
+          // Reactive-only avoidance (no future velocity lookahead)
+          let avX = 0, avY = 0, near = false;
+          for (const obs of [...state.staticObs, ...state.movingObs]) {
+            const d = dist(rob.x, rob.y, obs.x, obs.y) - obs.r - rob.r;
+            if (d < 46) {
+              near = true;
+              const away = Math.atan2(rob.y - obs.y, rob.x - obs.x);
+              avX += Math.cos(away) * (50 - d);
+              avY += Math.sin(away) * (50 - d);
+            }
+          }
+          if (state.dividerWall && hitsRect(rob.x, rob.y, rob.r + 22, state.dividerWall)) {
+            near = true;
+            avX += rob.x < state.dividerWall.x ? -35 : 35;
+            avY += -25;
+          }
+
+          if (near) {
+            ang = Math.atan2(avY + dy * 0.14, avX + dx * 0.14);
+            lm.token = avY < 0 ? 'TOK: DODGE_N' : 'TOK: DODGE_S';
+          } else {
+            lm.token = `TOK: STEP → ${tag}`;
+          }
+
+          // Quantized 8-way token action + autoregressive compounding drift
+          lm.drift = lm.drift * 0.86 + (Math.random() - 0.5) * (0.28 + (state.noiseLevel / 100) * 0.28);
+          const qAng = Math.round((ang + lm.drift) / (Math.PI / 4)) * (Math.PI / 4);
+          const spd = 2.35;
+          rob.vx = rob.vx * 0.35 + Math.cos(qAng) * spd * 0.65;
+          rob.vy = rob.vy * 0.35 + Math.sin(qAng) * spd * 0.65;
+        }
+
+        state.calloutLabel = lm.token;
+        state.calloutTone = 'info';
+      }
+
+      // --- MODE 2: Pixel-Space World Model (Sensitive to Noise, High Latency) ---
+      function stepPixelWM() {
+        const rob = state.robot;
+        const pm = state.pixelMem;
+        const nFrac = state.noiseLevel / 100;
+
+        state.mpcMem.rollouts = [];
+        state.mpcMem.best = null;
+        state.mpcMem.rolloutCount = 8;
+        state.mpcMem.latencyMs = Math.round(52 + nFrac * 155);
+        state.stuckAtGate = false;
+
+        pm.cooldown--;
+        if (pm.cooldown > 0) {
+          rob.vx = rob.vx * 0.88 + pm.vx * 0.12;
+          rob.vy = rob.vy * 0.88 + pm.vy * 0.12;
+          return;
+        }
+
+        // Replanning slows dramatically with irrelevant pixel clutter
+        pm.cooldown = Math.round(5 + nFrac * 20);
+
+        const tx = state.goal.x;
+        const ty = state.goal.y;
+        const baseAng = Math.atan2(ty - rob.y, tx - rob.x);
+        const horizon = Math.max(5, Math.round(14 - nFrac * 9));
+
+        let bestCost = Infinity;
+        let bestVx = 0, bestVy = 0, bestGhost = [];
+
+        for (let i = -4; i <= 4; i++) {
+          const ang = baseAng + i * 0.36 + (Math.random() - 0.5) * nFrac * 0.72;
+          const spd = 2.3 - nFrac * 0.65;
+          let sx = rob.x, sy = rob.y, cost = 0;
+          const pts = [];
+
+          for (let k = 1; k <= horizon; k++) {
+            sx += Math.cos(ang) * spd;
+            sy += Math.sin(ang) * spd;
+            if (k % 2 === 0) pts.push({ x: sx, y: sy });
+
+            if (sx < 18 || sx > ARENA_W - 18 || sy < 18 || sy > ARENA_H - 18) cost += 600;
+            for (const obs of state.staticObs) {
+              const jx = (Math.random() - 0.5) * nFrac * 38;
+              const jy = (Math.random() - 0.5) * nFrac * 38;
+              const d = dist(sx, sy, obs.x + jx, obs.y + jy) - obs.r - rob.r;
+              if (d < 8) cost += (12 - d) * 45;
+            }
+            for (const obs of state.movingObs) {
+              const pStep = Math.round(k * (1 - nFrac * 0.85));
+              const mp = getMovingObsPos(obs, pStep);
+              const d = dist(sx, sy, mp.x, mp.y) - mp.r - rob.r;
+              if (d < 10) cost += (14 - d) * 48;
+            }
+            if (hitsGate(sx, sy, rob.r)) cost += 650;
+            if (state.dividerWall && hitsRect(sx, sy, rob.r, state.dividerWall)) cost += 650;
+          }
+          cost += dist(sx, sy, tx, ty) * 1.5;
+          if (cost < bestCost) {
+            bestCost = cost;
+            bestVx = Math.cos(ang) * spd;
+            bestVy = Math.sin(ang) * spd;
+            bestGhost = pts;
+          }
+        }
+
+        pm.vx = bestVx;
+        pm.vy = bestVy;
+        pm.ghost = bestGhost;
+        rob.vx = rob.vx * 0.45 + bestVx * 0.55;
+        rob.vy = rob.vy * 0.45 + bestVy * 0.55;
+
+        if (nFrac >= 0.55) {
+          state.calloutLabel = 'PIXEL NOISE OVERLOAD!';
+          state.calloutTone = 'danger';
+        } else if (state.scenario === 'keygate' && !state.key.collected && rob.x > state.gate.x - 62) {
+          state.calloutLabel = 'STUCK AT GATE';
+          state.calloutTone = 'warn';
+        } else {
+          state.calloutLabel = 'GENERATING PIXELS...';
+          state.calloutTone = 'neutral';
+        }
+      }
+
+      // --- SHARED JEPA + MPC TRAJECTORY OPTIMIZER (Modes 3, 4, 5, 6) ---
+      function runJepaMPC(options) {
+        const {
+          targetX,
+          targetY,
+          numRollouts,
+          useRLCritic,
+          valueGrid,
+          warmStartAngle,
+          respectBlueZone,
+          spreadRad
+        } = options;
+
+        const rob = state.robot;
+        const horizon = 24;
+        const centerAngle = warmStartAngle !== null
+          ? warmStartAngle
+          : Math.atan2(targetY - rob.y, targetX - rob.x);
+
+        let bestCost = Infinity;
+        let bestTraj = null;
+        let bestVel = { vx: 0, vy: 0 };
+        const allRollouts = [];
+
+        for (let i = 0; i < numRollouts; i++) {
+          const frac = numRollouts === 1 ? 0 : (i / (numRollouts - 1)) * 2 - 1;
+          // Distribute candidates evenly across spreadRad; also mix slight curvature
+          const steerAngle = centerAngle + frac * spreadRad;
+          const curve = -frac * (useRLCritic ? 0.022 : 0.042);
+          const spd = 2.75;
+
+          let sx = rob.x;
+          let sy = rob.y;
+          let ang = steerAngle;
+          let cost = 0;
+          const pts = [{ x: sx, y: sy }];
+
+          for (let k = 1; k <= horizon; k++) {
+            ang += curve;
+            sx += Math.cos(ang) * spd;
+            sy += Math.sin(ang) * spd;
+            if (k % 2 === 0) pts.push({ x: sx, y: sy });
+
+            // Arena walls
+            if (sx < 16 || sx > ARENA_W - 16 || sy < 16 || sy > ARENA_H - 16) cost += 1400;
+
+            // Static obstacles in clean latent state
+            for (const obs of state.staticObs) {
+              const clr = dist(sx, sy, obs.x, obs.y) - obs.r - rob.r;
+              if (clr < 13) cost += clr < 0 ? 1800 : (13 - clr) * 65;
+            }
+
+            // Moving obstacles: JEPA Latent Predictor forecasts exact future positions
+            for (const obs of state.movingObs) {
+              const fut = getMovingObsPos(obs, k);
+              const clr = dist(sx, sy, fut.x, fut.y) - fut.r - rob.r;
+              if (clr < 15) cost += clr < 0 ? 2000 : (15 - clr) * 70;
+            }
+
+            // Divider wall & Locked Gate
+            if (state.dividerWall && hitsRect(sx, sy, rob.r + 3, state.dividerWall)) cost += 1900;
+            if (hitsGate(sx, sy, rob.r + 3)) cost += 2100;
+
+            // Zero-shot Blue Zone constraint (injected ONLY when LLM is active!)
+            if (respectBlueZone && isInBlueZone(sx, sy, rob.r + 5)) {
+              cost += 2400;
+            }
+
+            // Running cost
+            if (useRLCritic && valueGrid) {
+              cost -= sampleValue(valueGrid, sx, sy) * 18;
+            } else {
+              cost += dist(sx, sy, targetX, targetY) * 0.08;
+            }
+          }
+
+          // Terminal cost: Either TD-learned Value Function -V(s_H) or direct distance to target
+          if (useRLCritic && valueGrid) {
+            const termV = sampleValue(valueGrid, sx, sy);
+            cost += (1 - termV) * 1800;
+            // Subtle tie-breaker toward immediate target if close
+            if (dist(sx, sy, targetX, targetY) < 75) {
+              cost += dist(sx, sy, targetX, targetY) * 1.4;
+            }
+          } else {
+            cost += dist(sx, sy, targetX, targetY) * 2.6;
+          }
+
+          cost += Math.abs(frac) * 14;
+          allRollouts.push({ pts, cost });
+
+          if (cost < bestCost) {
+            bestCost = cost;
+            bestTraj = pts;
+            bestVel = { vx: Math.cos(steerAngle) * spd, vy: Math.sin(steerAngle) * spd };
+          }
+        }
+
+        state.mpcMem.rollouts = allRollouts;
+        state.mpcMem.best = bestTraj;
+        state.mpcMem.rolloutCount = numRollouts;
+
+        rob.vx = rob.vx * 0.42 + bestVel.vx * 0.58;
+        rob.vy = rob.vy * 0.42 + bestVel.vy * 0.58;
+      }
+
+      // --- MODE 3: Pure JEPA + MPC (Flat Latent Planner) ---
+      function stepJepaMPC() {
+        runJepaMPC({
+          targetX: state.goal.x,
+          targetY: state.goal.y,
+          numRollouts: 36,
+          useRLCritic: false,
+          valueGrid: null,
+          warmStartAngle: null,
+          respectBlueZone: false, // No LLM to parse zero-shot human language rule!
+          spreadRad: 2.35
+        });
+
+        state.mpcMem.latencyMs = 24;
+        if (state.scenario === 'keygate' && !state.key.collected && state.robot.x > state.gate.x - 65) {
+          state.stuckAtGate = true;
+          state.calloutLabel = 'LOCAL MINIMUM STUCK!';
+          state.calloutTone = 'danger';
+        } else {
+          state.stuckAtGate = false;
+          state.calloutLabel = state.inBlueZoneNow ? 'RULE VIOLATION!' : 'JEPA MPC (36 rollouts)';
+          state.calloutTone = state.inBlueZoneNow ? 'danger' : 'success';
+        }
+      }
+
+      // --- MODE 4: Hybrid: LLM + JEPA + MPC ---
+      function stepHybridLLMJepa() {
+        state.stuckAtGate = false;
+        let tx = state.goal.x;
+        let ty = state.goal.y;
+
+        if (state.scenario === 'keygate') {
+          if (!state.key.collected) {
+            // Guide around divider wall if needed, else directly to Key
+            if (state.robot.x > 165 && state.robot.y > 110) {
+              tx = 125;
+              ty = 130;
+            } else {
+              tx = state.key.x;
+              ty = state.key.y;
+            }
+            state.hybridMem.subgoal = 'Subgoal: Key';
+          } else {
+            state.hybridMem.subgoal = 'Subgoal: Gate → Goal';
+          }
+        } else if (state.scenario === 'ruleshift') {
+          // LLM decomposes zero-shot safe waypoint below Blue Zone
+          if (state.robot.x < state.blueZone.x + state.blueZone.w + 18 && state.robot.y < state.blueZone.y + state.blueZone.h + 25) {
+            tx = state.blueZone.x + state.blueZone.w * 0.55;
+            ty = state.blueZone.y + state.blueZone.h + 48;
+            state.hybridMem.subgoal = 'Zero-Shot: Detour Blue Zone';
+          } else {
+            state.hybridMem.subgoal = 'Zero-Shot: Safe → Goal';
+          }
+        } else {
+          state.hybridMem.subgoal = 'Goal Pursuit';
+        }
+
+        runJepaMPC({
+          targetX: tx,
+          targetY: ty,
+          numRollouts: 36,
+          useRLCritic: false,
+          valueGrid: null,
+          warmStartAngle: null,
+          respectBlueZone: true,
+          spreadRad: 2.35
+        });
+
+        state.mpcMem.latencyMs = 28;
+        state.calloutLabel = state.hybridMem.subgoal;
+        state.calloutTone = 'info';
+      }
+
+      // --- MODE 5: JEPA + RL (Critic/Actor) + MPC (TD-MPC2 / TD-JEPA Style) ---
+      function stepJepaRLMPC() {
+        state.stuckAtGate = false;
+        const grid = getActiveValueGrid();
+        const tx = (state.scenario === 'keygate' && !state.key.collected) ? state.key.x : state.goal.x;
+        const ty = (state.scenario === 'keygate' && !state.key.collected) ? state.key.y : state.goal.y;
+
+        // RL Actor warm-starts MPC around the TD Value gradient -> only 11 rollouts needed!
+        const actorProposalAngle = sampleValueGradientAngle(grid, state.robot.x, state.robot.y);
+
+        runJepaMPC({
+          targetX: tx,
+          targetY: ty,
+          numRollouts: 11,
+          useRLCritic: true,
+          valueGrid: grid,
+          warmStartAngle: actorProposalAngle,
+          respectBlueZone: false, // Stale RL Critic/Actor ignores brand-new Blue Zone rule!
+          spreadRad: 1.35
+        });
+
+        state.mpcMem.latencyMs = 8;
+        if (state.inBlueZoneNow) {
+          state.calloutLabel = 'RULE VIOLATION! (Stale RL)';
+          state.calloutTone = 'danger';
+        } else if (state.scenario === 'keygate' && !state.key.collected) {
+          state.calloutLabel = 'RL V(s) Guided → Key';
+          state.calloutTone = 'warn';
+        } else {
+          state.calloutLabel = 'RL V(s) Warm-Start (11)';
+          state.calloutTone = 'warn';
+        }
+      }
+
+      // --- MODE 6: Full Triad (LLM + JEPA + RL + MPC) ---
+      function stepFullTriad() {
+        state.stuckAtGate = false;
+        const grid = getActiveValueGrid(); // Uses LLM-masked safe grid in Scenario 4!
+        const tx = (state.scenario === 'keygate' && !state.key.collected) ? state.key.x : state.goal.x;
+        const ty = (state.scenario === 'keygate' && !state.key.collected) ? state.key.y : state.goal.y;
+
+        // RL Actor proposes fast warm-start aligned with LLM-constrained value field
+        const actorProposalAngle = sampleValueGradientAngle(grid, state.robot.x, state.robot.y);
+
+        runJepaMPC({
+          targetX: tx,
+          targetY: ty,
+          numRollouts: 12,
+          useRLCritic: true,
+          valueGrid: grid,
+          warmStartAngle: actorProposalAngle,
+          respectBlueZone: true, // LLM enforces zero-shot Blue Zone constraint!
+          spreadRad: 1.45
+        });
+
+        state.mpcMem.latencyMs = 10;
+        if (state.scenario === 'keygate' && !state.key.collected) {
+          state.calloutLabel = 'Triad: Key via V(s) + LLM';
+          state.calloutTone = 'success';
+        } else if (state.scenario === 'ruleshift') {
+          state.calloutLabel = 'Zero-Shot Safe + Fast RL';
+          state.calloutTone = 'success';
+        } else {
+          state.calloutLabel = 'Full Triad Active (12)';
+          state.calloutTone = 'success';
+        }
+      }
+
+      /* -----------------------------------------------------------------------
+         8. MAIN PHYSICS & SIMULATION TICK
+         ----------------------------------------------------------------------- */
+      function stepSimulation() {
+        state.step++;
+        if (state.collisionCooldown > 0) state.collisionCooldown--;
+        if (state.violationCooldown > 0) state.violationCooldown--;
+
+        // Animate irrelevant visual clutter
+        for (const p of state.noiseParticles) {
+          p.x = (p.x + p.vx + ARENA_W) % ARENA_W;
+          p.y = (p.y + p.vy + ARENA_H) % ARENA_H;
+          p.phase += 0.08;
+        }
+
+        // Update moving obstacles (unless currently dragged)
+        for (const obs of state.movingObs) {
+          if (state.dragObj === obs) continue;
+          const prevY = obs.y;
+          const pos = getMovingObsPos(obs, 0);
+          obs.x = pos.x;
+          obs.y = pos.y;
+          obs.vy = obs.y - prevY;
+        }
+
+        // Animate gate opening once key collected
+        if (state.scenario === 'keygate' && state.key.collected) {
+          state.gate.openProgress = Math.min(1, state.gate.openProgress + 0.048);
+        }
+
+        // Handle episode reset pause after reaching goal
+        if (state.goalResetTimer > 0) {
+          state.goalResetTimer--;
+          if (state.goalResetTimer === 0) {
+            setupScenario(false);
+          }
+          return;
+        }
+
+        // Dispatch active architecture controller
+        switch (state.arch) {
+          case 'llm': stepLLM(); break;
+          case 'pixel': stepPixelWM(); break;
+          case 'jepa_mpc': stepJepaMPC(); break;
+          case 'llm_jepa_mpc': stepHybridLLMJepa(); break;
+          case 'jepa_rl_mpc': stepJepaRLMPC(); break;
+          case 'full_triad': stepFullTriad(); break;
+        }
+
+        // Integrate robot position with wall/gate collision resolution
+        const rob = state.robot;
+        let nx = clamp(rob.x + rob.vx, rob.r + 4, ARENA_W - rob.r - 4);
+        let ny = clamp(rob.y + rob.vy, rob.r + 4, ARENA_H - rob.r - 4);
+
+        // Divider wall check
+        if (state.dividerWall && hitsRect(nx, ny, rob.r, state.dividerWall)) {
+          if (!hitsRect(rob.x, ny, rob.r, state.dividerWall)) {
+            nx = rob.x;
+            rob.vx *= -0.3;
+          } else if (!hitsRect(nx, rob.y, rob.r, state.dividerWall)) {
+            ny = rob.y;
+            rob.vy *= -0.3;
+          } else {
+            nx = rob.x;
+            ny = rob.y;
+          }
+        }
+
+        // Locked Gate check
+        if (hitsGate(nx, ny, rob.r)) {
+          nx = Math.min(rob.x, state.gate.x - rob.r - 1);
+          rob.vx = -Math.abs(rob.vx) * 0.25;
+        }
+
+        rob.x = nx;
+        rob.y = ny;
+
+        if (Math.hypot(rob.vx, rob.vy) > 0.18) {
+          rob.angle = Math.atan2(rob.vy, rob.vx);
+        }
+
+        // Motion trail
+        if (state.step % 3 === 0) {
+          rob.trail.push({ x: rob.x, y: rob.y });
+          if (rob.trail.length > 60) rob.trail.shift();
+        }
+
+        // Obstacle collisions
+        for (const obs of [...state.staticObs, ...state.movingObs]) {
+          const d = dist(rob.x, rob.y, obs.x, obs.y);
+          const minD = rob.r + obs.r;
+          if (d < minD && d > 0.001) {
+            const ux = (rob.x - obs.x) / d;
+            const uy = (rob.y - obs.y) / d;
+            rob.x = clamp(obs.x + ux * (minD + 1), rob.r + 4, ARENA_W - rob.r - 4);
+            rob.y = clamp(obs.y + uy * (minD + 1), rob.r + 4, ARENA_H - rob.r - 4);
+            rob.vx = ux * 1.5;
+            rob.vy = uy * 1.5;
+            if (state.collisionCooldown === 0) {
+              state.collisions++;
+              state.collisionCooldown = 26;
+            }
+          }
+        }
+
+        // Forbidden Blue Zone violation detection (Scenario 4)
+        state.inBlueZoneNow = isInBlueZone(rob.x, rob.y, -2);
+        if (state.inBlueZoneNow && state.violationCooldown === 0) {
+          state.ruleViolations++;
+          state.violationCooldown = 28;
+        }
+
+        // Key pickup (Scenario 3)
+        if (state.scenario === 'keygate' && !state.key.collected) {
+          if (dist(rob.x, rob.y, state.key.x, state.key.y) < rob.r + state.key.r + 5) {
+            state.key.collected = true;
+          }
+        }
+
+        // Goal reached
+        if (dist(rob.x, rob.y, state.goal.x, state.goal.y) < rob.r + state.goal.r) {
+          state.goals++;
+          state.goalResetTimer = 36;
+          state.calloutLabel = 'GOAL REACHED!';
+          state.calloutTone = 'success';
+        }
+
+        // Perturbation shockwave animation
+        if (state.perturbRing) {
+          state.perturbRing.r += 3.5;
+          state.perturbRing.alpha -= 0.038;
+          if (state.perturbRing.alpha <= 0) state.perturbRing = null;
+        }
+
+        // Refresh UI telemetry periodically
+        if (state.step % 10 === 0) {
+          updateDynamicTelemetry();
+        }
+      }
+
+      /* -----------------------------------------------------------------------
+         9. HIGH-DPI 2D CANVAS RENDERING
+         ----------------------------------------------------------------------- */
+      function resizeCanvas() {
+        const rect = canvasWrapper.getBoundingClientRect();
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        canvas.width = Math.round(rect.width * dpr);
+        canvas.height = Math.round(rect.height * dpr);
+      }
+
+      function roundRectPath(x, y, w, h, r) {
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.lineTo(x + w - r, y);
+        ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+        ctx.lineTo(x + w, y + h - r);
+        ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+        ctx.lineTo(x + r, y + h);
+        ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+        ctx.lineTo(x, y + r);
+        ctx.quadraticCurveTo(x, y, x + r, y);
+        ctx.closePath();
+      }
+
+      function drawRLHeatmap() {
+        const isRLMode = state.arch === 'jepa_rl_mpc' || state.arch === 'full_triad';
+        if (!state.showHeatmap || !isRLMode) return;
+
+        const grid = getActiveValueGrid();
+        if (!grid || !grid.length) return;
+
+        for (let r = 0; r < GRID_ROWS; r++) {
+          for (let c = 0; c < GRID_COLS; c++) {
+            const v = grid[r][c];
+            if (v <= 0.02) continue;
+            // Warm amber -> rich emerald gradient showing long-horizon TD value V(s)
+            const hue = 36 + v * 114; // 36 (amber) -> 150 (emerald)
+            const alpha = 0.07 + v * 0.28;
+            ctx.fillStyle = `hsla(${hue}, 82%, 52%, ${alpha})`;
+            ctx.fillRect(c * CELL_W, r * CELL_H, CELL_W + 0.5, CELL_H + 0.5);
+
+            // Subtle value gradient arrows every 2 cells
+            if (r % 2 === 1 && c % 2 === 1 && v > 0.08 && v < 0.94) {
+              const cx = (c + 0.5) * CELL_W;
+              const cy = (r + 0.5) * CELL_H;
+              const ang = sampleValueGradientAngle(grid, cx, cy);
+              ctx.save();
+              ctx.translate(cx, cy);
+              ctx.rotate(ang);
+              ctx.strokeStyle = `rgba(180, 83, 9, ${0.22 + v * 0.35})`;
+              ctx.lineWidth = 1.2;
+              ctx.beginPath();
+              ctx.moveTo(-4, 0);
+              ctx.lineTo(4, 0);
+              ctx.lineTo(1.5, -2.5);
+              ctx.moveTo(4, 0);
+              ctx.lineTo(1.5, 2.5);
+              ctx.stroke();
+              ctx.restore();
+            }
+          }
+        }
+
+        // Small corner tag explaining the heatmap
+        ctx.save();
+        ctx.fillStyle = 'rgba(255, 251, 235, 0.92)';
+        ctx.strokeStyle = '#f59e0b';
+        ctx.lineWidth = 1.2;
+        roundRectPath(10, ARENA_H - 30, 198, 22, 6);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = '#92400e';
+        ctx.font = '700 10px Inter, sans-serif';
+        ctx.textAlign = 'left';
+        const hmText = (state.scenario === 'ruleshift' && state.arch === 'jepa_rl_mpc')
+          ? 'RL V(s): Stale Old-Reward Field'
+          : 'RL Critic V(s): Long-Horizon Value';
+        ctx.fillText(hmText, 18, ARENA_H - 15.5);
+        ctx.restore();
+      }
+
+      function renderCanvas() {
+        const sx = canvas.width / ARENA_W;
+        const sy = canvas.height / ARENA_H;
+        ctx.save();
+        ctx.scale(sx, sy);
+
+        // 1. White engineering grid
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, ARENA_W, ARENA_H);
+
+        ctx.strokeStyle = '#f1f5f9';
+        ctx.lineWidth = 1;
+        for (let x = 32; x < ARENA_W; x += 32) {
+          ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, ARENA_H); ctx.stroke();
+        }
+        for (let y = 32; y < ARENA_H; y += 32) {
+          ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(ARENA_W, y); ctx.stroke();
+        }
+
+        // 2. RL Value Function Heatmap V(s) (under obstacles/rollouts)
+        drawRLHeatmap();
+
+        // 3. Irrelevant Stochastic Visual Noise
+        if (state.noiseLevel > 0) {
+          const frac = state.noiseLevel / 100;
+          const cnt = Math.floor(state.noiseParticles.length * frac);
+          for (let i = 0; i < cnt; i++) {
+            const p = state.noiseParticles[i];
+            const flk = 0.22 + 0.55 * Math.abs(Math.sin(p.phase));
+            if (p.kind === 0) {
+              ctx.fillStyle = `rgba(34, 197, 94, ${flk * 0.25})`;
+              ctx.beginPath();
+              ctx.ellipse(p.x, p.y, p.size * 1.1, p.size * 0.5, p.phase, 0, Math.PI * 2);
+              ctx.fill();
+            } else if (p.kind === 1) {
+              ctx.fillStyle = `rgba(148, 163, 184, ${flk * 0.28})`;
+              ctx.fillRect(p.x, p.y, p.size * 0.9, p.size * 0.9);
+            } else {
+              ctx.strokeStyle = `rgba(56, 189, 248, ${flk * 0.3})`;
+              ctx.lineWidth = 1.2;
+              ctx.beginPath();
+              ctx.arc(p.x, p.y, p.size, 0, Math.PI * 1.4);
+              ctx.stroke();
+            }
+          }
+        }
+
+        // 4. Scenario 4: Forbidden Blue Zone
+        if (state.blueZone.active) {
+          const bz = state.blueZone;
+          ctx.fillStyle = state.inBlueZoneNow ? 'rgba(37, 99, 235, 0.28)' : 'rgba(59, 130, 246, 0.16)';
+          ctx.strokeStyle = state.inBlueZoneNow ? '#dc2626' : '#2563eb';
+          ctx.lineWidth = state.inBlueZoneNow ? 2.5 : 1.8;
+          ctx.setLineDash([6, 4]);
+          roundRectPath(bz.x, bz.y, bz.w, bz.h, 10);
+          ctx.fill();
+          ctx.stroke();
+          ctx.setLineDash([]);
+
+          ctx.fillStyle = '#1d4ed8';
+          ctx.font = '800 11px Inter, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText('FORBIDDEN BLUE ZONE', bz.x + bz.w / 2, bz.y + bz.h / 2 - 4);
+          ctx.font = '600 9.5px Inter, sans-serif';
+          ctx.fillStyle = '#1e40af';
+          ctx.fillText('New Human Rule: Do NOT Enter!', bz.x + bz.w / 2, bz.y + bz.h / 2 + 12);
+        }
+
+        // 5. Scenario 3: Divider Wall, Key & Locked/Unlocked Gate
+        if (state.dividerWall) {
+          const w = state.dividerWall;
+          ctx.fillStyle = '#cbd5e1';
+          ctx.strokeStyle = '#475569';
+          ctx.lineWidth = 1.5;
+          roundRectPath(w.x, w.y, w.w, w.h, 4);
+          ctx.fill();
+          ctx.stroke();
+        }
+
+        if (state.scenario === 'keygate') {
+          const g = state.gate;
+          const gapHalf = g.openProgress * 74;
+          const midY = ARENA_H / 2 + 10;
+
+          ctx.fillStyle = state.key.collected ? '#10b981' : '#f59e0b';
+          ctx.strokeStyle = '#0f172a';
+          ctx.lineWidth = 1.4;
+
+          const topH = Math.max(0, midY - gapHalf - g.y);
+          if (topH > 2) { roundRectPath(g.x, g.y, g.w, topH, 4); ctx.fill(); ctx.stroke(); }
+          const botY = midY + gapHalf;
+          const botH = Math.max(0, g.y + g.h - botY);
+          if (botH > 2) { roundRectPath(g.x, botY, g.w, botH, 4); ctx.fill(); ctx.stroke(); }
+
+          ctx.fillStyle = state.key.collected ? '#047857' : '#b45309';
+          ctx.font = '700 10px Inter, sans-serif';
+          ctx.textAlign = 'right';
+          ctx.fillText(state.key.collected ? 'GATE UNLOCKED' : 'LOCKED GATE', g.x - 8, 28);
+
+          if (!state.key.collected) {
+            const k = state.key;
+            const pulse = 1 + Math.sin(state.step * 0.1) * 0.14;
+            ctx.fillStyle = 'rgba(245, 158, 11, 0.22)';
+            ctx.beginPath(); ctx.arc(k.x, k.y, k.r * 1.65 * pulse, 0, Math.PI * 2); ctx.fill();
+
+            ctx.fillStyle = '#f59e0b';
+            ctx.strokeStyle = '#78350f';
+            ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.arc(k.x, k.y, k.r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '800 9.5px Inter, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('KEY', k.x, k.y + 3.5);
+          }
+        }
+
+        // 6. Goal Marker
+        const gl = state.goal;
+        ctx.fillStyle = 'rgba(16, 185, 129, 0.16)';
+        ctx.beginPath(); ctx.arc(gl.x, gl.y, gl.r + 8, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#10b981';
+        ctx.strokeStyle = '#047857';
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(gl.x, gl.y, gl.r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '800 10px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('GOAL', gl.x, gl.y + 3.5);
+
+        // 7. MPC Candidate Rollout Arcs (color-coded by cost, best highlighted)
+        if (state.showRollouts && state.mpcMem.rollouts.length > 0) {
+          let minC = Infinity, maxC = -Infinity;
+          for (const r of state.mpcMem.rollouts) {
+            if (r.cost < minC) minC = r.cost;
+            if (r.cost > maxC) maxC = r.cost;
+          }
+          const span = Math.max(1, maxC - minC);
+
+          ctx.setLineDash([3, 3]);
+          ctx.lineWidth = 1.25;
+          for (const r of state.mpcMem.rollouts) {
+            const norm = clamp((r.cost - minC) / span, 0, 1);
+            // Low cost = blue/emerald, high cost = rose/gray
+            ctx.strokeStyle = norm < 0.25
+              ? 'rgba(37, 99, 235, 0.42)'
+              : norm < 0.65
+                ? 'rgba(148, 163, 184, 0.34)'
+                : 'rgba(225, 29, 72, 0.26)';
+            ctx.beginPath();
+            for (let i = 0; i < r.pts.length; i++) {
+              if (i === 0) ctx.moveTo(r.pts[i].x, r.pts[i].y);
+              else ctx.lineTo(r.pts[i].x, r.pts[i].y);
+            }
+            ctx.stroke();
+          }
+          ctx.setLineDash([]);
+
+          if (state.mpcMem.best && state.mpcMem.best.length > 1) {
+            ctx.strokeStyle = '#2563eb';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            for (let i = 0; i < state.mpcMem.best.length; i++) {
+              if (i === 0) ctx.moveTo(state.mpcMem.best[i].x, state.mpcMem.best[i].y);
+              else ctx.lineTo(state.mpcMem.best[i].x, state.mpcMem.best[i].y);
+            }
+            ctx.stroke();
+          }
+        }
+
+        // Pixel-WM blurry ghost rollout
+        if (state.arch === 'pixel' && state.pixelMem.ghost.length > 0) {
+          const nFrac = state.noiseLevel / 100;
+          ctx.strokeStyle = `rgba(225, 29, 72, ${0.55 - nFrac * 0.25})`;
+          ctx.lineWidth = 2.5 + nFrac * 6;
+          ctx.setLineDash([4, 4]);
+          ctx.beginPath();
+          ctx.moveTo(state.robot.x, state.robot.y);
+          for (const pt of state.pixelMem.ghost) ctx.lineTo(pt.x, pt.y);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+
+        // 8. Robot Trail
+        const activeArch = ARCHS.find(a => a.id === state.arch);
+        if (state.robot.trail.length > 1) {
+          ctx.strokeStyle = activeArch.accentHex;
+          ctx.globalAlpha = 0.28;
+          ctx.lineWidth = 2.5;
+          ctx.beginPath();
+          ctx.moveTo(state.robot.trail[0].x, state.robot.trail[0].y);
+          for (let i = 1; i < state.robot.trail.length; i++) {
+            ctx.lineTo(state.robot.trail[i].x, state.robot.trail[i].y);
+          }
+          ctx.stroke();
+          ctx.globalAlpha = 1;
+        }
+
+        // 9. Static Obstacles (draggable)
+        for (const obs of state.staticObs) {
+          ctx.fillStyle = '#64748b';
+          ctx.strokeStyle = '#334155';
+          ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.arc(obs.x, obs.y, obs.r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+
+          ctx.fillStyle = '#e2e8f0';
+          for (let dx = -4; dx <= 4; dx += 4) {
+            for (let dy = -3; dy <= 3; dy += 6) {
+              ctx.beginPath(); ctx.arc(obs.x + dx, obs.y + dy, 1.3, 0, Math.PI * 2); ctx.fill();
+            }
+          }
+        }
+
+        // 10. Moving Obstacles (also draggable)
+        for (const obs of state.movingObs) {
+          ctx.strokeStyle = 'rgba(225, 29, 72, 0.18)';
+          ctx.lineWidth = 2;
+          ctx.setLineDash([3, 4]);
+          ctx.beginPath();
+          ctx.moveTo(obs.baseX, clamp(obs.baseY - obs.ampY, obs.r + 12, ARENA_H - obs.r - 12));
+          ctx.lineTo(obs.baseX, clamp(obs.baseY + obs.ampY, obs.r + 12, ARENA_H - obs.r - 12));
+          ctx.stroke();
+          ctx.setLineDash([]);
+
+          ctx.fillStyle = '#f43f5e';
+          ctx.strokeStyle = '#9f1239';
+          ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.arc(obs.x, obs.y, obs.r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+
+          const dir = obs.vy >= 0 ? 1 : -1;
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(obs.x - 5, obs.y - 2 * dir);
+          ctx.lineTo(obs.x, obs.y + 4 * dir);
+          ctx.lineTo(obs.x + 5, obs.y - 2 * dir);
+          ctx.stroke();
+        }
+
+        // 11. Perturbation Ring
+        if (state.perturbRing) {
+          ctx.strokeStyle = `rgba(225, 29, 72, ${state.perturbRing.alpha})`;
+          ctx.lineWidth = 2.5;
+          ctx.beginPath();
+          ctx.arc(state.perturbRing.x, state.perturbRing.y, state.perturbRing.r, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+
+        // 12. Robot Agent
+        const rob = state.robot;
+        ctx.save();
+        ctx.translate(rob.x, rob.y);
+        ctx.rotate(rob.angle);
+        ctx.fillStyle = (state.collisionCooldown > 16 || state.inBlueZoneNow) ? '#dc2626' : '#0f172a';
+        ctx.strokeStyle = activeArch.accentHex;
+        ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(0, 0, rob.r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.moveTo(rob.r - 3, 0);
+        ctx.lineTo(2, -4.5);
+        ctx.lineTo(2, 4.5);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+
+        // 13. Floating Callout Pill above Robot
+        if (state.calloutLabel) {
+          ctx.font = '700 10.5px Inter, sans-serif';
+          const tw = ctx.measureText(state.calloutLabel).width + 16;
+          const bx = clamp(rob.x - tw / 2, 8, ARENA_W - tw - 8);
+          const by = clamp(rob.y - rob.r - 28, 8, ARENA_H - 30);
+
+          const toneMap = {
+            neutral: { bg: '#f8fafc', br: '#64748b', tx: '#334155' },
+            info:    { bg: '#eef2ff', br: '#4f46e5', tx: '#3730a3' },
+            warn:    { bg: '#fffbeb', br: '#d97706', tx: '#92400e' },
+            danger:  { bg: '#fef2f2', br: '#dc2626', tx: '#991b1b' },
+            success: { bg: '#ecfdf5', br: '#059669', tx: '#065f46' }
+          };
+          const t = toneMap[state.calloutTone] || toneMap.neutral;
+
+          ctx.fillStyle = t.bg;
+          ctx.strokeStyle = t.br;
+          ctx.lineWidth = 1.4;
+          roundRectPath(bx, by, tw, 21, 6);
+          ctx.fill();
+          ctx.stroke();
+
+          ctx.fillStyle = t.tx;
+          ctx.textAlign = 'center';
+          ctx.fillText(state.calloutLabel, bx + tw / 2, by + 14);
+        }
+
+        // 14. Pixel-WM Blurry Mini-Preview (Top-Right)
+        if (state.arch === 'pixel') {
+          drawPixelMiniFrame();
+        }
+
+        ctx.restore();
+      }
+
+      function drawPixelMiniFrame() {
+        const w = 138, h = 84;
+        const x = ARENA_W - w - 10, y = 10;
+        const nFrac = state.noiseLevel / 100;
+
+        ctx.save();
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.94)';
+        ctx.strokeStyle = '#e11d48';
+        ctx.lineWidth = 1.5;
+        roundRectPath(x, y, w, h, 8);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = '#be123c';
+        ctx.font = '700 9px Inter, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText('PREDICTED PIXEL FRAME', x + 8, y + 13);
+
+        const ix = x + 6, iy = y + 18, iw = w - 12, ih = h - 24;
+        ctx.fillStyle = '#f8fafc';
+        ctx.fillRect(ix, iy, iw, ih);
+
+        const sx = iw / ARENA_W, sy = ih / ARENA_H;
+        const jit = nFrac * 8;
+        ctx.fillStyle = `rgba(244, 63, 94, ${0.85 - nFrac * 0.45})`;
+        for (const obs of state.movingObs) {
+          ctx.beginPath();
+          ctx.arc(ix + obs.x * sx + (Math.random() - 0.5) * jit, iy + obs.y * sy + (Math.random() - 0.5) * jit, 4 + nFrac * 3, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.fillStyle = '#0f172a';
+        ctx.beginPath();
+        ctx.arc(ix + state.robot.x * sx, iy + state.robot.y * sy, 3.2, 0, Math.PI * 2);
+        ctx.fill();
+
+        const dots = Math.floor(nFrac * 150);
+        for (let i = 0; i < dots; i++) {
+          ctx.fillStyle = i % 2 === 0 ? 'rgba(225, 29, 72, 0.35)' : 'rgba(148, 163, 184, 0.45)';
+          ctx.fillRect(ix + Math.random() * (iw - 3), iy + Math.random() * (ih - 3), 3, 3);
+        }
+        ctx.restore();
+      }
+
+      /* -----------------------------------------------------------------------
+         10. UI BUILDERS & LIVE TELEMETRY UPDATES
+         ----------------------------------------------------------------------- */
+      function buildArchSelector() {
+        archSelector.innerHTML = ARCHS.map((a) => {
+          const isActive = a.id === state.arch;
+          const badgeDots = a.badges.map(b =>
+            `<span class="inline-block w-2 h-2 rounded-full ${b.cls}" title="${b.label}"></span>`
+          ).join('');
+          return `
+            <button data-arch="${a.id}" role="tab" aria-selected="${isActive}"
+              class="arch-btn text-left p-2.5 rounded-xl border transition cursor-pointer flex flex-col justify-between gap-1 ${
+                isActive ? a.activeCardCls : 'border-slate-200 bg-slate-50/70 hover:bg-white hover:border-slate-300'
+              }">
+              <div class="flex items-center justify-between gap-1.5">
+                <span class="text-xs font-bold text-slate-900 leading-tight">${a.shortTitle}</span>
+                <span class="flex items-center gap-1 shrink-0">${badgeDots}</span>
+              </div>
+              <span class="text-[11px] text-slate-500 leading-tight">${a.subtitle}</span>
+            </button>
+          `;
+        }).join('');
+
+        archSelector.querySelectorAll('.arch-btn').forEach(btn => {
+          btn.addEventListener('click', () => {
+            state.arch = btn.dataset.arch;
+            state.stuckAtGate = false;
+            state.inBlueZoneNow = false;
+            // Default heatmap toggle ON when switching to an RL mode
+            if (state.arch === 'jepa_rl_mpc' || state.arch === 'full_triad') {
+              state.showHeatmap = true;
+              toggleHeatmap.checked = true;
+            }
+            updateAllUI();
+          });
+        });
+      }
+
+      function buildComparisonMatrix() {
+        matrixBody.innerHTML = ARCHS.map(a => {
+          const active = a.id === state.arch;
+          const pills = a.badges.map(b =>
+            `<span class="inline-block w-2 h-2 rounded-full ${b.cls}"></span>`
+          ).join('');
+          return `
+            <tr class="${active ? a.rowHighlightCls + ' font-medium' : 'hover:bg-slate-50/70'} transition">
+              <td class="py-2.5 px-4 whitespace-nowrap">
+                <div class="flex items-center gap-2 font-bold text-slate-900">
+                  <span class="flex items-center gap-1">${pills}</span>
+                  <span>${a.shortTitle}</span>
+                </div>
+              </td>
+              <td class="py-2.5 px-4 text-slate-700">${a.matrix.rep}</td>
+              <td class="py-2.5 px-4 text-slate-700">${a.matrix.localOpt}</td>
+              <td class="py-2.5 px-4 text-slate-700">${a.matrix.noise}</td>
+              <td class="py-2.5 px-4 text-slate-700">${a.matrix.compute}</td>
+              <td class="py-2.5 px-4 text-slate-700">${a.matrix.zeroShot}</td>
+              <td class="py-2.5 px-4 font-mono text-xs text-slate-700 whitespace-nowrap">${a.matrix.ref}</td>
+            </tr>
+          `;
+        }).join('');
+      }
+
+      function renderPipeline() {
+        const a = state.arch;
+        const sc = state.scenario;
+
+        const hasLLM = a === 'llm' || a === 'llm_jepa_mpc' || a === 'full_triad';
+        const hasRL = a === 'jepa_rl_mpc' || a === 'full_triad';
+        const hasJEPA = a === 'jepa_mpc' || a === 'llm_jepa_mpc' || a === 'jepa_rl_mpc' || a === 'full_triad';
+        const hasPixel = a === 'pixel';
+        const hasMPC = hasJEPA;
+
+        // Live 1-line real-time telemetry per module
+        let llmReadout = 'Inactive — No symbolic task planner or language interface.';
+        if (a === 'llm') {
+          llmReadout = `Reactive token policy emitting ${state.llmMem.token} (no physics lookahead).`;
+        } else if (a === 'llm_jepa_mpc') {
+          llmReadout = sc === 'keygate'
+            ? (state.key.collected ? 'Subgoal 2 active: Gate unlocked → Route to Goal.' : 'Subgoal 1 active: Decomposed non-convex detour → Collect Key.')
+            : sc === 'ruleshift'
+              ? 'Zero-shot rule parsed: Injecting hard Forbidden Blue Zone constraint.'
+              : 'Monitoring task goal; delegating continuous control to JEPA + MPC.';
+        } else if (a === 'full_triad') {
+          llmReadout = sc === 'ruleshift'
+            ? 'Zero-shot override: Masking stale RL value inside Forbidden Blue Zone!'
+            : sc === 'keygate'
+              ? (state.key.collected ? 'Gate open → aligned with RL Critic toward Goal.' : 'Confirming Key → Gate task structure; supervising RL + JEPA.')
+              : 'High-level goal verified (low Hz); RL + JEPA handle fast loop.';
+        }
+
+        let rlReadout = 'Inactive — No learned value function V(s) or Actor warm-start.';
+        if (a === 'jepa_rl_mpc') {
+          rlReadout = sc === 'ruleshift'
+            ? 'WARNING: Stale Critic V(s) ignores new Blue Zone — needs retraining!'
+            : sc === 'keygate'
+              ? (state.key.collected ? 'Post-key V(s) guides through gate; Actor warm-starts 11 rollouts.' : 'TD Critic V(s) propagates Key value backward, escaping local min!')
+              : 'Actor proposes warm-start direction; Critic scores terminal s_H.';
+        } else if (a === 'full_triad') {
+          rlReadout = sc === 'ruleshift'
+            ? 'Actor warm-starts 12 rollouts using LLM-masked safe Value Field V(s).'
+            : 'Critic V(s) + Actor warm-start cut MPC rollouts by ~67% (12 vs 36).';
+        }
+
+        let wmTitle = hasPixel ? '3. Pixel-Space World Model' : '3. JEPA Latent World Model';
+        let wmColor = hasPixel ? 'rose' : 'emerald';
+        let wmActive = hasPixel || hasJEPA;
+        let wmReadout = 'Inactive — No internal physics world model.';
+        if (hasPixel) {
+          wmReadout = state.noiseLevel >= 50
+            ? `Degraded! Predicting ${state.noiseLevel}% noisy RGB pixels slows replanning.`
+            : `Generating raw future pixel frames (${state.noiseLevel}% visual clutter).`;
+        } else if (hasJEPA) {
+          wmReadout = `Encoder strips ${state.noiseLevel}% pixel noise → clean latent s_t + dynamics rollout.`;
+        }
+
+        let ctrlTitle = a === 'llm' ? '4. Autoregressive Token Sampler' : '4. MPC Trajectory Optimizer';
+        let ctrlColor = a === 'llm' ? 'indigo' : 'blue';
+        let ctrlActive = a === 'llm' || hasMPC || hasPixel;
+        let ctrlReadout = '';
+        if (a === 'llm') {
+          ctrlReadout = 'Greedy next-token sampling (8 discrete directions, compounding drift).';
+        } else if (hasPixel) {
+          ctrlReadout = `Slow greedy policy over blurry pixel rollouts (${state.mpcMem.latencyMs} ms/step).`;
+        } else if (a === 'jepa_mpc') {
+          ctrlReadout = state.stuckAtGate
+            ? 'TRAPPED! 36 short-horizon rollouts cannot see past locked gate.'
+            : 'Searching 36 unprimed latent trajectories/step to minimize C(s).';
+        } else if (a === 'llm_jepa_mpc') {
+          ctrlReadout = 'Searching 36 unprimed rollouts/step toward LLM subgoal (higher compute).';
+        } else {
+          ctrlReadout = `Fast warm-started MPC: only ${state.mpcMem.rolloutCount} rollouts/step (${state.mpcMem.latencyMs} ms).`;
+        }
+
+        const blocks = [
+          { title: '1. LLM Strategic Planner', color: 'indigo', active: hasLLM, readout: llmReadout, tag: 'System 2 / Symbolic' },
+          { title: '2. RL Critic V(s) & Actor', color: 'amber', active: hasRL, readout: rlReadout, tag: 'TD Value + Warm-Start' },
+          { title: wmTitle, color: wmColor, active: wmActive, readout: wmReadout, tag: hasPixel ? 'RGB Pixels' : 'Latent Dynamics' },
+          { title: ctrlTitle, color: ctrlColor, active: ctrlActive, readout: ctrlReadout, tag: a === 'llm' ? 'Discrete Policy' : 'Continuous Control' }
+        ];
+
+        const colorStyles = {
+          indigo:  { border: 'border-l-indigo-600 border-indigo-200 bg-indigo-50/40', dot: 'bg-indigo-600', text: 'text-indigo-800', pill: 'bg-indigo-100 text-indigo-700' },
+          amber:   { border: 'border-l-amber-500 border-amber-200 bg-amber-50/40', dot: 'bg-amber-500', text: 'text-amber-900', pill: 'bg-amber-100 text-amber-800' },
+          emerald: { border: 'border-l-emerald-600 border-emerald-200 bg-emerald-50/40', dot: 'bg-emerald-600', text: 'text-emerald-900', pill: 'bg-emerald-100 text-emerald-700' },
+          blue:    { border: 'border-l-blue-600 border-blue-200 bg-blue-50/40', dot: 'bg-blue-600', text: 'text-blue-900', pill: 'bg-blue-100 text-blue-700' },
+          rose:    { border: 'border-l-rose-600 border-rose-200 bg-rose-50/40', dot: 'bg-rose-600', text: 'text-rose-900', pill: 'bg-rose-100 text-rose-700' }
+        };
+
+        pipelineContainer.innerHTML = blocks.map((b, idx) => {
+          const cs = colorStyles[b.color];
+          const arrow = idx < blocks.length - 1
+            ? `<div class="flex justify-center -my-1 text-slate-300 text-xs font-bold select-none">&darr;</div>`
+            : '';
+
+          if (!b.active) {
+            return `
+              <div class="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 opacity-50">
+                <div class="flex items-center justify-between gap-2">
+                  <span class="text-xs font-bold text-slate-500">${b.title}</span>
+                  <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-200 text-slate-500">INACTIVE</span>
+                </div>
+                <p class="text-[11px] text-slate-400 mt-0.5 truncate">${b.readout}</p>
+              </div>
+              ${arrow}
+            `;
+          }
+
+          return `
+            <div class="rounded-xl border border-l-4 ${cs.border} px-3 py-2 transition">
+              <div class="flex items-center justify-between gap-2">
+                <div class="flex items-center gap-2">
+                  <span class="w-2 h-2 rounded-full ${cs.dot} live-dot shrink-0"></span>
+                  <span class="text-xs font-bold ${cs.text}">${b.title}</span>
+                </div>
+                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded ${cs.pill}">${b.tag}</span>
+              </div>
+              <p class="text-[11.5px] text-slate-700 mt-1 leading-snug">${b.readout}</p>
+            </div>
+            ${arrow}
+          `;
+        }).join('');
+      }
+
+      function getDynamicExplanation() {
+        const a = state.arch;
+        const sc = state.scenario;
+
+        const map = {
+          llm: {
+            dynamic: 'An Autoregressive LLM emits discrete action tokens based on the immediate state without rolling out continuous physics trajectories. It reacts late to fast moving obstacles and oscillates after perturbations.',
+            noise: 'Visual clutter adds prompt/perception jitter, causing slightly noisier token sampling, though the core failure remains the lack of continuous trajectory lookahead.',
+            keygate: 'The LLM understands the symbolic rule ("collect Key before Gate") and heads toward the Key, but discrete token control without MPC makes it sluggish and error-prone around moving obstacles.',
+            ruleshift: 'Because the LLM reads human language natively, it adapts zero-shot to the Forbidden Blue Zone rule—routing around it—even though its low-level motor control remains reactive and choppy.'
+          },
+          pixel: {
+            dynamic: 'The Pixel-Space World Model tries to predict full future RGB frames. Even with low clutter, generating pixels is computationally slow, delaying obstacle avoidance.',
+            noise: `At ${state.noiseLevel}% irrelevant visual noise, the Pixel-Space World Model wastes massive capacity predicting meaningless flickering shapes—producing blurry predictions, high latency (${state.mpcMem.latencyMs} ms), and collisions.`,
+            keygate: 'Predicting raw pixels over a short horizon cannot discover the non-convex Key → Gate detour. The model burns heavy compute and stalls near the locked gate.',
+            ruleshift: 'Without a language interface, the Pixel-Space World Model does not understand the newly declared Forbidden Blue Zone rule and suffers heavy compute lag.'
+          },
+          jepa_mpc: {
+            dynamic: 'JEPA encodes obstacles into a compact latent state s_t and forecasts moving trajectories cleanly. MPC searches 36 candidate arcs/step to pick a smooth, collision-free path and recovers fast from perturbations.',
+            noise: `JEPA’s Context Encoder discards all ${state.noiseLevel}% irrelevant pixel noise before prediction. Notice how MPC rollouts remain razor-sharp and unaffected by heavy visual clutter.`,
+            keygate: 'Watch the classic MPC trap: even with a clean JEPA physics model, minimizing flat distance cost C(s) over a short horizon gets trapped in a non-convex local minimum in front of the locked gate!',
+            ruleshift: 'JEPA + MPC handles obstacles cleanly, but without an LLM to parse the brand-new human rule ("Do NOT enter Blue Zone!"), it optimizes the old physical path right through the forbidden zone.'
+          },
+          llm_jepa_mpc: {
+            dynamic: 'The Hybrid architecture delegates smooth physical navigation to JEPA + MPC while the LLM supervises at low frequency. However, without RL warm-starting, MPC still searches 36 trajectories from scratch each step.',
+            noise: 'JEPA filters out all irrelevant background noise cleanly while the LLM maintains task intent—delivering noise-invariant continuous control.',
+            keygate: 'The LLM escapes the locked-gate local minimum via discrete semantic decomposition ("Subgoal 1: Key → Subgoal 2: Gate → Goal"), temporarily convexifying the cost landscape for JEPA + MPC.',
+            ruleshift: 'Zero-shot adaptation in action: the LLM immediately parses the new Forbidden Blue Zone rule and injects a hard cost constraint into MPC, routing safely around the zone with 0 violations.'
+          },
+          jepa_rl_mpc: {
+            dynamic: 'TD-MPC2 / TD-JEPA style: the RL Actor warm-starts MPC around the learned Value gradient, cutting search to just 11 rollouts/step (~3x faster compute than unprimed MPC) while keeping smooth JEPA physics.',
+            noise: 'JEPA strips out all irrelevant pixel clutter, while the RL Critic V(s) and Actor operate purely in the clean latent space—fast, smooth, and noise-immune.',
+            keygate: 'No LLM needed here! Toggle the RL Value Heatmap V(s) to see how TD-learning propagated long-horizon reward backward into the Key alcove—guiding MPC smoothly out of the local minimum with only 11 rollouts/step.',
+            ruleshift: 'Crucial RL limitation: the RL Critic V(s) and Actor were trained on the OLD reward function. Because it has no LLM to parse the sudden human rule shift, it cuts straight through the Forbidden Blue Zone until retrained!'
+          },
+          full_triad: {
+            dynamic: 'All four components work in harmony: JEPA models clean physics, RL Actor warm-starts MPC (only 12 rollouts/step), MPC guarantees smooth obstacle clearance, and the LLM supervises high-level intent.',
+            noise: 'JEPA completely eliminates the stochastic visual noise, while RL warm-starting keeps per-step MPC latency minimal.',
+            keygate: 'Both the LLM’s task structure and the RL Critic’s long-horizon Value Heatmap V(s) align—solving the non-convex Key → Gate detour smoothly, cleanly, and with ~67% less MPC compute.',
+            ruleshift: 'Best of all worlds: the LLM adapts zero-shot to the Forbidden Blue Zone rule by masking the stale RL value inside the zone, while RL warm-starting + JEPA + MPC still execute fast, smooth, zero-violation control!'
+          }
+        };
+
+        return map[a][sc];
+      }
+
+      function updateDynamicTelemetry() {
+        const activeArch = ARCHS.find(a => a.id === state.arch);
+        pipelineModeBadge.textContent = activeArch.shortTitle;
+
+        metricLatency.textContent = `${state.mpcMem.latencyMs} ms`;
+        metricLatencyNote.textContent = state.arch === 'pixel' && state.noiseLevel > 50
+          ? 'Noise lag!'
+          : (state.arch === 'jepa_rl_mpc' || state.arch === 'full_triad') ? 'RL warm-start' : 'Per step';
+
+        metricRollouts.textContent = String(state.mpcMem.rolloutCount);
+        metricRolloutsNote.textContent = state.mpcMem.rolloutCount === 0
+          ? 'Reactive'
+          : state.mpcMem.rolloutCount <= 12
+            ? 'Warm-started'
+            : 'From scratch';
+
+        metricViolations.textContent = `${state.collisions} / ${state.ruleViolations}`;
+        metricViolations.className = `text-lg font-extrabold font-mono ${
+          state.ruleViolations > 0 ? 'text-rose-600' : 'text-slate-900'
+        }`;
+        metricGoals.textContent = `${state.goals} Goal${state.goals === 1 ? '' : 's'}`;
+
+        // Live Task Status Badge (with explicit Stale Reward Policy warning for Mode 5 + Scenario 4)
+        let statusText = 'Navigating';
+        let statusCls = 'bg-slate-100 text-slate-800';
+
+        if (state.arch === 'jepa_rl_mpc' && state.scenario === 'ruleshift') {
+          statusText = 'Stale Reward Policy — Needs Retraining';
+          statusCls = 'bg-rose-100 text-rose-800 border border-rose-300';
+        } else if (state.stuckAtGate) {
+          statusText = 'Stuck in Local Minimum';
+          statusCls = 'bg-rose-100 text-rose-800 border border-rose-300';
+        } else if (state.inBlueZoneNow) {
+          statusText = 'Rule Violation Active!';
+          statusCls = 'bg-rose-100 text-rose-800 border border-rose-300';
+        } else if (state.goalResetTimer > 0) {
+          statusText = 'Goal Reached!';
+          statusCls = 'bg-emerald-100 text-emerald-800 border border-emerald-300';
+        } else if (state.scenario === 'keygate' && state.key.collected) {
+          statusText = 'Key Collected → Gate Open';
+          statusCls = 'bg-emerald-50 text-emerald-800 border border-emerald-200';
+        } else if (state.arch === 'pixel' && state.noiseLevel >= 60) {
+          statusText = 'Degraded by Pixel Noise';
+          statusCls = 'bg-amber-100 text-amber-900 border border-amber-300';
+        }
+
+        metricStatus.textContent = statusText;
+        metricStatus.className = `inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold ${statusCls}`;
+
+        explainTag.textContent = `${activeArch.shortTitle.replace(/^\d+\.\s*/, '')}`;
+        explainText.textContent = getDynamicExplanation();
+
+        renderPipeline();
+      }
+
+      function updateAllUI() {
+        buildArchSelector();
+        buildComparisonMatrix();
+
+        scenarioBtns.forEach(btn => {
+          const active = btn.dataset.scenario === state.scenario;
+          btn.className = `scenario-btn px-3 py-1.5 rounded-lg text-xs font-semibold border transition cursor-pointer ${
+            active
+              ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
+              : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+          }`;
+        });
+
+        noiseSlider.value = state.noiseLevel;
+        noiseVal.textContent = `${state.noiseLevel}%`;
+        btnPlayPause.textContent = state.running ? 'Pause' : 'Play';
+
+        updateDynamicTelemetry();
+      }
+
+      /* -----------------------------------------------------------------------
+         11. INTERACTIVE EVENTS (Scenarios, Perturbation, Sliders, Obstacle Drag)
+         ----------------------------------------------------------------------- */
+      scenarioBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+          state.scenario = btn.dataset.scenario;
+          if (state.scenario === 'noise') state.noiseLevel = 85;
+          else if (state.noiseLevel > 50) state.noiseLevel = 15;
+          setupScenario(true);
+        });
+      });
+
+      btnPlayPause.addEventListener('click', () => {
+        state.running = !state.running;
+        btnPlayPause.textContent = state.running ? 'Pause' : 'Play';
+      });
+
+      btnReset.addEventListener('click', () => {
+        setupScenario(true);
+      });
+
+      btnPerturb.addEventListener('click', () => {
+        const ang = (Math.random() - 0.5) * Math.PI * 2;
+        state.robot.vx += Math.cos(ang) * 6.0;
+        state.robot.vy += Math.sin(ang) * 6.0;
+        state.llmMem.drift += (Math.random() - 0.5) * 1.2;
+        state.perturbRing = { x: state.robot.x, y: state.robot.y, r: 12, alpha: 0.95 };
+      });
+
+      noiseSlider.addEventListener('input', (e) => {
+        state.noiseLevel = Number(e.target.value);
+        noiseVal.textContent = `${state.noiseLevel}%`;
+        updateDynamicTelemetry();
+      });
+
+      toggleHeatmap.addEventListener('change', (e) => {
+        state.showHeatmap = e.target.checked;
+      });
+
+      toggleRollouts.addEventListener('change', (e) => {
+        state.showRollouts = e.target.checked;
+      });
+
+      // Mouse & Touch dragging for ALL obstacles (static & moving)
+      function getCanvasPoint(evt) {
+        const rect = canvas.getBoundingClientRect();
+        const cx = evt.touches ? evt.touches[0].clientX : evt.clientX;
+        const cy = evt.touches ? evt.touches[0].clientY : evt.clientY;
+        return {
+          x: ((cx - rect.left) / rect.width) * ARENA_W,
+          y: ((cy - rect.top) / rect.height) * ARENA_H
+        };
+      }
+
+      function onDown(evt) {
+        const pt = getCanvasPoint(evt);
+        for (const obs of state.staticObs) {
+          if (dist(pt.x, pt.y, obs.x, obs.y) <= obs.r + 6) {
+            state.dragObj = obs;
+            state.dragIsMoving = false;
+            state.dragOffsetX = obs.x - pt.x;
+            state.dragOffsetY = obs.y - pt.y;
+            canvas.style.cursor = 'grabbing';
+            evt.preventDefault();
+            return;
+          }
+        }
+        for (const obs of state.movingObs) {
+          if (dist(pt.x, pt.y, obs.x, obs.y) <= obs.r + 6) {
+            state.dragObj = obs;
+            state.dragIsMoving = true;
+            state.dragOffsetX = obs.x - pt.x;
+            state.dragOffsetY = obs.y - pt.y;
+            canvas.style.cursor = 'grabbing';
+            evt.preventDefault();
+            return;
+          }
+        }
+      }
+
+      function onMove(evt) {
+        const pt = getCanvasPoint(evt);
+        if (state.dragObj) {
+          const nx = clamp(pt.x + state.dragOffsetX, 36, ARENA_W - 36);
+          const ny = clamp(pt.y + state.dragOffsetY, 36, ARENA_H - 36);
+          state.dragObj.x = nx;
+          state.dragObj.y = ny;
+          if (state.dragIsMoving) {
+            state.dragObj.baseX = nx;
+            state.dragObj.baseY = ny;
+          } else {
+            rebuildValueGrids();
+          }
+          saveCustomObstacles();
+          evt.preventDefault();
+          return;
+        }
+        const over = [...state.staticObs, ...state.movingObs].some(o => dist(pt.x, pt.y, o.x, o.y) <= o.r + 5);
+        canvas.style.cursor = over ? 'grab' : 'default';
+      }
+
+      function onUp() {
+        if (state.dragObj) {
+          saveCustomObstacles();
+          state.dragObj = null;
+          canvas.style.cursor = 'default';
+          rebuildValueGrids();
+        }
+      }
+
+      canvas.addEventListener('mousedown', onDown);
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', onUp);
+      canvas.addEventListener('touchstart', onDown, { passive: false });
+      window.addEventListener('touchmove', onMove, { passive: false });
+      window.addEventListener('touchend', onUp);
+
+      window.addEventListener('resize', () => {
+        resizeCanvas();
+        renderCanvas();
+      });
+
+      /* -----------------------------------------------------------------------
+         12. ANIMATION LOOP & BOOTSTRAP
+         ----------------------------------------------------------------------- */
+      function loop() {
+        if (state.running) {
+          stepSimulation();
+        }
+        renderCanvas();
+        requestAnimationFrame(loop);
+      }
+
+      window.onload = function () {
+        try {
+          initNoiseParticles();
+          resizeCanvas();
+          setupScenario(true);
+          loop();
+        } catch (err) {
+          console.error('Demonstrator initialization error:', err);
+        }
+      };
+    })();
+  </script>
+</body>
+</html>

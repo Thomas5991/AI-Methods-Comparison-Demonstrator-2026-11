@@ -1,0 +1,48 @@
+Attached is a demonstrator of different AI algorithms. The current version reverts the position of two user-movable obstacles back to the default position after each run. These should stay where the user moved them, across runs and also when switching to other methods. Do keep everything of the tool intact. if you have suggestions for other changes/improvments just propose them in the chat and not implement them.
+
+
+The following are some background informations from the agent that build the original version:
+
+
+Project Overview: AI Architectures in Action (2D Robotics Sandbox)
+
+This single-file HTML/Canvas demonstrator (ai_architecture_demonstrator.html) visually teaches the structural differences, strengths, and failure modes of LLMs, World Models (Pixel-Space vs. JEPA), Reinforcement Learning (Critic/Actor), and Model Predictive Control (MPC)—as well as how they complement each other in hybrid setups.
+
+The 6 Demonstrated Architectures
+
+    Autoregressive LLM (Reactive Token Policy):
+
+    Operates in discrete token space without continuous physics rollouts.
+    Demonstrates: Strong semantic understanding of symbolic rules (e.g., "collect key" or "avoid blue zone"), but choppy, reactive control, poor anticipation of moving obstacles, and compounding drift after perturbations.
+
+    Pixel-Space World Model (Generative Video Predictor):
+
+    Predicts future states by generating raw RGB frames.
+    Demonstrates: High compute latency and severe degradation under irrelevant visual clutter (wastes capacity predicting stochastic background noise, resulting in blurry rollouts).
+
+    JEPA + MPC (Latent World Model + Flat Search):
+
+    Encodes observations into a compact, noise-free latent state $s_t$, predicts future dynamics cleanly, and uses unprimed MPC (36 rollouts/step) to pick collision-free trajectories.
+    Demonstrates: Smooth, noise-invariant physical control and obstacle anticipation, but gets trapped in non-convex local minima (locked gate) and cannot parse brand-new symbolic rules.
+
+    Hybrid: LLM + JEPA + MPC:
+
+    Pairs an LLM high-level planner with JEPA + MPC low-level control.
+    Demonstrates: The LLM escapes local minima via discrete subgoal decomposition (Key → Gate → Goal) and injects zero-shot human rules as MPC constraints, while JEPA + MPC handles smooth, noise-free execution. However, MPC still searches from scratch (high rollout count).
+
+    JEPA + RL (Critic/Actor) + MPC (TD-MPC2 / TD-JEPA style, no LLM):
+
+    Adds a TD-learned Value Function Critic $V(s)$ (rendered as a live heatmap) and an RL Actor that warm-starts MPC.
+    Demonstrates: Escapes the locked-gate local minimum without an LLM (via long-horizon value propagation) and slashes MPC compute (~11 warm-started rollouts/step). Weakness: Relies on its previously trained reward function, so it fails when a brand-new symbolic rule is introduced zero-shot.
+
+    Full Triad: LLM + JEPA + RL + MPC:
+
+    Combines all four components.
+    Demonstrates: Zero-shot symbolic adaptability (LLM masks stale RL values in forbidden zones), fast warm-started planning (RL Actor + Critic $V(s)$), and noise-free physical rollouts (JEPA + MPC).
+
+The 4 Scenarios & What They Isolate
+
+    Dynamic Obstacles: Contrasts reactive token control (LLM) against predictive continuous trajectory rollouts (JEPA + MPC) and perturbation recovery.
+    High-Noise Env: Uses an adjustable irrelevant-pixel-noise slider to contrast Pixel-Space World Models (which degrade and lag) against JEPA's latent encoder (which strips visual clutter completely).
+    Key & Gate (Local Minimum): Tests non-convex multi-stage planning where moving directly toward the goal hits a locked barrier—showing how flat JEPA + MPC gets stuck, while both LLM subgoals (Mode 4) and an RL Critic $V(s)$ (Mode 5) solve the detour differently.
+    Zero-Shot Rule Shift: Introduces a sudden human-specified Forbidden Blue Zone blocking the previously optimal path—exposing why JEPA + RL + MPC (stale reward policy) violates the rule without retraining, whereas LLM-assisted modes (Modes 1, 4, and 6) adapt immediately.

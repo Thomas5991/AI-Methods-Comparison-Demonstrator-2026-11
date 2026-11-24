@@ -3,7 +3,7 @@
 ## Project Overview
 Single-file HTML/Canvas 2D demonstrators:
 1. Robotics sandbox (`ai_architectures_in_action_llms_jepa_rl_mpc_demonstrator-v2.html`) comparing six AI architectures across four interactive scenarios (`Handover message.txt`).
-2. Energy-aware planning & control sandbox (`ai_architectures_energy_planning_demonstrator-v1.html`) comparing six AI architectures across Industrial DSM (Case A) and CHP District Heating Dispatch (Case B) (`Energy Demo.txt`).
+2. Energy-aware planning & control sandbox (`ai_architectures_energy_planning_demonstrator-v1.html`, `ai_architectures_energy_planning_demonstrator-v2.html`) comparing six AI architectures across Industrial DSM (Case A) and CHP District Heating Dispatch (Case B) (`Energy Demo.txt`).
 
 ## Session Start
 Read `tasklist.md` and `projectknowledge.md` before acting on any request. Do the same after any context summary or compression before continuing: work from the files, not from the summary.
